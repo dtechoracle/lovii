@@ -1,98 +1,226 @@
-import { Image } from 'expo-image';
-import { Platform, StyleSheet } from 'react-native';
-
-import { HelloWave } from '@/components/hello-wave';
-import ParallaxScrollView from '@/components/parallax-scroll-view';
+import FilterChips from '@/components/home/FilterChips';
+import FloatingBar from '@/components/home/FloatingBar';
+import GalleryCard from '@/components/home/GalleryCard';
+import TaskCard from '@/components/home/TaskCard';
+import ScreenHeader from '@/components/ScreenHeader';
 import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { Link } from 'expo-router';
+import WidgetCard from '@/components/WidgetCard';
+import { Colors } from '@/constants/theme';
+import { Note, StorageService, UserProfile } from '@/services/storage';
+import { Ionicons } from '@expo/vector-icons';
+import { Link, useFocusEffect, useRouter } from 'expo-router';
+import React, { useCallback, useEffect, useState } from 'react';
+import { RefreshControl, ScrollView, StatusBar, StyleSheet, TouchableOpacity, View } from 'react-native';
 
 export default function HomeScreen() {
-  return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
-      headerImage={
-        <Image
-          source={require('@/assets/images/partial-react-logo.png')}
-          style={styles.reactLogo}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Welcome!</ThemedText>
-        <HelloWave />
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 1: Try it</ThemedText>
-        <ThemedText>
-          Edit <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> to see changes.
-          Press{' '}
-          <ThemedText type="defaultSemiBold">
-            {Platform.select({
-              ios: 'cmd + d',
-              android: 'cmd + m',
-              web: 'F12',
-            })}
-          </ThemedText>{' '}
-          to open developer tools.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <Link href="/modal">
-          <Link.Trigger>
-            <ThemedText type="subtitle">Step 2: Explore</ThemedText>
-          </Link.Trigger>
-          <Link.Preview />
-          <Link.Menu>
-            <Link.MenuAction title="Action" icon="cube" onPress={() => alert('Action pressed')} />
-            <Link.MenuAction
-              title="Share"
-              icon="square.and.arrow.up"
-              onPress={() => alert('Share pressed')}
-            />
-            <Link.Menu title="More" icon="ellipsis">
-              <Link.MenuAction
-                title="Delete"
-                icon="trash"
-                destructive
-                onPress={() => alert('Delete pressed')}
-              />
-            </Link.Menu>
-          </Link.Menu>
-        </Link>
+  const router = useRouter();
+  const [latestNote, setLatestNote] = useState<Note | null>(null);
+  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const [pinnedNotes, setPinnedNotes] = useState<Note[]>([]);
+  const [bookmarkedNotes, setBookmarkedNotes] = useState<Note[]>([]);
 
-        <ThemedText>
-          {`Tap the Explore tab to learn more about what's included in this starter app.`}
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 3: Get a fresh start</ThemedText>
-        <ThemedText>
-          {`When you're ready, run `}
-          <ThemedText type="defaultSemiBold">npm run reset-project</ThemedText> to get a fresh{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> directory. This will move the current{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> to{' '}
-          <ThemedText type="defaultSemiBold">app-example</ThemedText>.
-        </ThemedText>
-      </ThemedView>
-    </ParallaxScrollView>
+  const loadData = async () => {
+    const p = await StorageService.getProfile();
+    setProfile(p);
+
+    // Get the absolute latest note from either me or partner
+    const pNotes = await StorageService.getPartnerNotes();
+    const mHistory = await StorageService.getMyHistory();
+
+    // Combine and sort
+    const allNotes = [...pNotes, ...mHistory].sort((a, b) => b.timestamp - a.timestamp);
+
+    if (allNotes.length > 0) {
+      setLatestNote(allNotes[0]);
+    }
+
+    // Get pinned and bookmarked notes
+    const pinned = mHistory.filter(n => n.pinned);
+    const bookmarked = mHistory.filter(n => n.bookmarked);
+    setPinnedNotes(pinned);
+    setBookmarkedNotes(bookmarked);
+  };
+
+  // Initialize profile on first launch
+  useEffect(() => {
+    const initProfile = async () => {
+      let profile = await StorageService.getProfile();
+      if (!profile) {
+        profile = await StorageService.createProfile();
+      }
+      setProfile(profile);
+    };
+    initProfile();
+  }, []);
+
+  // Subscribe to partner's notes
+  useEffect(() => {
+    const subscription = StorageService.subscribeToPartnerNotes((note) => {
+      console.log('New note from partner:', note);
+      loadData(); // Refresh data when partner sends a note
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadData();
+    }, [])
+  );
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await loadData();
+    setRefreshing(false);
+  }, []);
+
+  return (
+    <View style={styles.container}>
+      <StatusBar barStyle="light-content" />
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        refreshControl={<RefreshControl refreshing={refreshing} tintColor={Colors.dark.primary} />}
+      >
+        <ScreenHeader
+          rightAction={
+            <Link href="/connect" asChild>
+              <TouchableOpacity style={styles.profilePic}>
+                <Ionicons name="person" size={20} color="#FFF" />
+              </TouchableOpacity>
+            </Link>
+          }
+        />
+
+        <ThemedText type="title" style={styles.appTitle}>Your Notes</ThemedText>
+
+        <FilterChips />
+
+        {/* Hero Card - Widget */}
+        <WidgetCard
+          note={latestNote}
+          onPress={() => router.push('/editor')}
+        />
+
+        {/* Pinned Notes */}
+        {pinnedNotes.length > 0 && (
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Ionicons name="pin" size={20} color="#FFD60A" />
+              <ThemedText type="subtitle" style={styles.sectionTitle}>Pinned</ThemedText>
+            </View>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.horizontalScroll}>
+              {pinnedNotes.map(note => (
+                <TouchableOpacity key={note.id} style={styles.miniCard}>
+                  <ThemedText style={styles.miniCardText} numberOfLines={2}>
+                    {note.type === 'text' ? note.content : note.type === 'collage' ? '📸 Collage' : '🎨 Drawing'}
+                  </ThemedText>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        )}
+
+        {/* Bookmarked Notes */}
+        {bookmarkedNotes.length > 0 && (
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Ionicons name="bookmark" size={20} color="#FFD60A" />
+              <ThemedText type="subtitle" style={styles.sectionTitle}>Bookmarked</ThemedText>
+            </View>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.horizontalScroll}>
+              {bookmarkedNotes.map(note => (
+                <TouchableOpacity key={note.id} style={styles.miniCard}>
+                  <ThemedText style={styles.miniCardText} numberOfLines={2}>
+                    {note.type === 'text' ? note.content : note.type === 'collage' ? '📸 Collage' : '🎨 Drawing'}
+                  </ThemedText>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        )}
+
+        {/* Bento Grid */}
+        <View style={styles.bentoRow}>
+          <TaskCard />
+          <GalleryCard />
+        </View>
+
+        {/* Bottom Spacer for Floating Bar */}
+        <View style={{ height: 100 }} />
+
+      </ScrollView>
+
+      <FloatingBar />
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  titleContainer: {
+  container: {
+    flex: 1,
+    backgroundColor: Colors.dark.background,
+  },
+  scrollContent: {
+    padding: 24,
+    paddingTop: 60,
+  },
+  appTitle: {
+    fontSize: 40,
+    fontWeight: '800',
+    color: '#FFF',
+    marginBottom: 24,
+    letterSpacing: -0.5,
+  },
+  bentoRow: {
+    flexDirection: 'row',
+    gap: 16,
+  },
+  profilePic: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#1C1C1E',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#2C2C2E',
+  },
+  section: {
+    marginBottom: 24,
+  },
+  sectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
+    marginBottom: 12,
+    paddingHorizontal: 4,
   },
-  stepContainer: {
-    gap: 8,
-    marginBottom: 8,
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#FFF',
   },
-  reactLogo: {
-    height: 178,
-    width: 290,
-    bottom: 0,
-    left: 0,
-    position: 'absolute',
+  horizontalScroll: {
+    gap: 12,
+    paddingHorizontal: 4,
+  },
+  miniCard: {
+    width: 150,
+    height: 80,
+    backgroundColor: '#1C1C1E',
+    borderRadius: 16,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#2C2C2E',
+    justifyContent: 'center',
+  },
+  miniCardText: {
+    fontSize: 14,
+    color: '#FFF',
+    fontWeight: '600',
   },
 });

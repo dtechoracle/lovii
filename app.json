@@ -9,7 +9,13 @@
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.dtechoracle.lovii",
+      "entitlements": {
+        "com.apple.security.application-groups": [
+          "group.com.dtechoracle.lovii"
+        ]
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -19,10 +25,12 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "package": "com.dtechoracle.lovii"
     },
     "web": {
-      "output": "static",
+      "output": "server",
+      "bundler": "metro",
       "favicon": "./assets/images/favicon.png"
     },
     "plugins": [
@@ -38,11 +46,60 @@
             "backgroundColor": "#000000"
           }
         }
+      ],
+      [
+        "react-native-widget-extension",
+        {
+          "widgetsFolder": "widgets",
+          "deploymentTarget": "14.0",
+          "frequentUpdates": true,
+          "ios": {
+            "src": "widgets/ios",
+            "mode": "production",
+            "devTeamId": "",
+            "appleTeamId": "",
+            "deploymentTarget": "14.0"
+          },
+          "android": {
+            "src": "widgets/android",
+            "widgets": [
+              {
+                "name": "LoviiWidget",
+                "label": "Partner's Note",
+                "description": "See your partner's latest note",
+                "minWidth": "2x2",
+                "maxWidth": "4x4",
+                "minHeight": "2x2",
+                "maxHeight": "4x4",
+                "previewImage": "./assets/images/widget-preview.png"
+              }
+            ]
+          }
+        }
       ]
     ],
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "build": {
+          "experimental": {
+            "ios": {
+              "appExtensions": [
+                {
+                  "targetName": "loviiWidgets",
+                  "bundleIdentifier": "com.dtechoracle.lovii.loviiWidgets",
+                  "entitlements": {}
+                }
+              ]
+            }
+          }
+        },
+        "projectId": "a0a03da8-f568-4d1d-b878-3ed96319155d"
+      }
     }
   }
 }
