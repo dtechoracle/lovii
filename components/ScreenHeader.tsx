@@ -26,7 +26,7 @@ export default function ScreenHeader({ title, showBack = false, rightAction, onB
             <View style={styles.leftContainer}>
                 {showBack && (
                     <TouchableOpacity style={styles.iconBtn} onPress={handleBack}>
-                        <Ionicons name="arrow-back" size={24} color="#FFF" />
+                        <Ionicons name="arrow-back" size={24} color="#4B6EFF" />
                     </TouchableOpacity>
                 )}
             </View>
@@ -66,16 +66,20 @@ const styles = StyleSheet.create({
     title: {
         fontSize: 18,
         fontWeight: '700',
-        color: '#FFF',
+        color: '#4B6EFF', // Deeper Blue Text
     },
     iconBtn: {
         width: 44,
         height: 44,
         borderRadius: 22,
-        backgroundColor: '#1C1C1E',
+        backgroundColor: '#FFFFFF', // White background
         alignItems: 'center',
         justifyContent: 'center',
-        borderWidth: 1,
-        borderColor: '#2C2C2E',
+        // Soft Shadow
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+        elevation: 2,
     },
 });

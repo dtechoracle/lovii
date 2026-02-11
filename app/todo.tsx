@@ -1,5 +1,6 @@
 import ScreenHeader from '@/components/ScreenHeader';
-import { Colors } from '@/constants/theme';
+import OutlinedCard from '@/components/ui/OutlinedCard';
+import { useTheme } from '@/context/ThemeContext';
 import { StorageService, Task } from '@/services/storage';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -8,6 +9,7 @@ import { FlatList, KeyboardAvoidingView, Platform, StatusBar, StyleSheet, Text, 
 
 export default function TodoScreen() {
     const router = useRouter();
+    const { theme } = useTheme();
     const [tasks, setTasks] = useState<Task[]>([]);
     const [newTask, setNewTask] = useState('');
 
@@ -42,28 +44,30 @@ export default function TodoScreen() {
     };
 
     const renderItem = ({ item }: { item: Task }) => (
-        <View style={styles.item}>
-            <TouchableOpacity style={styles.checkBtn} onPress={() => toggleTask(item.id)}>
-                <Ionicons
-                    name={item.completed ? "checkmark-circle" : "ellipse-outline"}
-                    size={24}
-                    color={item.completed ? "#8E8E93" : Colors.dark.primary}
-                />
-            </TouchableOpacity>
-            <Text style={[styles.itemText, item.completed && styles.itemTextDone]}>{item.text}</Text>
-            <TouchableOpacity style={styles.deleteBtn} onPress={() => deleteTask(item.id)}>
-                <Ionicons name="trash-outline" size={20} color="#FF3B30" />
-            </TouchableOpacity>
-        </View>
+        <TouchableOpacity activeOpacity={0.8} onPress={() => toggleTask(item.id)}>
+            <OutlinedCard style={[styles.item, item.completed && styles.itemDone]}>
+                <TouchableOpacity style={styles.checkBtn} onPress={() => toggleTask(item.id)}>
+                    <Ionicons
+                        name={item.completed ? "checkmark-circle" : "ellipse-outline"}
+                        size={24}
+                        color={item.completed ? "#4B6EFF" : "#8E8E93"}
+                    />
+                </TouchableOpacity>
+                <Text style={[styles.itemText, item.completed && styles.itemTextDone]}>{item.text}</Text>
+                <TouchableOpacity style={styles.deleteBtn} onPress={() => deleteTask(item.id)}>
+                    <Ionicons name="trash-outline" size={20} color="#FF3B30" />
+                </TouchableOpacity>
+            </OutlinedCard>
+        </TouchableOpacity>
     );
 
     return (
         <KeyboardAvoidingView
             behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-            style={styles.container}
+            style={[styles.container, { backgroundColor: theme.background }]}
         >
-            <StatusBar barStyle="light-content" />
-            <ScreenHeader title="Shared Tasks" showBack />
+            <StatusBar barStyle="dark-content" />
+            <ScreenHeader title="Tasks" showBack />
 
             <View style={{ flex: 1 }}>
                 <FlatList
@@ -73,25 +77,27 @@ export default function TodoScreen() {
                     contentContainerStyle={styles.list}
                     ListEmptyComponent={
                         <View style={styles.empty}>
-                            <Ionicons name="checkbox-outline" size={64} color="#3A3A3C" />
-                            <Text style={styles.emptyText}>No tasks yet. Add one!</Text>
+                            <Ionicons name="checkbox-outline" size={64} color="#C7C7CC" />
+                            <Text style={styles.emptyText}>No tasks yet</Text>
                         </View>
                     }
                 />
             </View>
 
             <View style={styles.inputContainer}>
-                <TextInput
-                    style={styles.input}
-                    placeholder="Add a new task..."
-                    placeholderTextColor="#636366"
-                    value={newTask}
-                    onChangeText={setNewTask}
-                    onSubmitEditing={handleAddTask}
-                />
-                <TouchableOpacity style={styles.addBtn} onPress={handleAddTask}>
-                    <Ionicons name="arrow-up" size={24} color="#000" />
-                </TouchableOpacity>
+                <View style={styles.inputWrapper}>
+                    <TextInput
+                        style={styles.input}
+                        placeholder="Add a new task..."
+                        placeholderTextColor="#8E8E93"
+                        value={newTask}
+                        onChangeText={setNewTask}
+                        onSubmitEditing={handleAddTask}
+                    />
+                    <TouchableOpacity style={styles.addBtn} onPress={handleAddTask}>
+                        <Ionicons name="arrow-up" size={20} color="#FFF" />
+                    </TouchableOpacity>
+                </View>
             </View>
         </KeyboardAvoidingView>
     );
@@ -100,33 +106,36 @@ export default function TodoScreen() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: Colors.dark.background,
         paddingTop: 60,
     },
     list: {
-        paddingHorizontal: 20,
+        paddingHorizontal: 24,
         paddingBottom: 100,
+        gap: 12,
     },
     item: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: '#1C1C1E',
         padding: 16,
-        borderRadius: 20,
-        marginBottom: 12,
+        borderRadius: 24,
+        backgroundColor: '#FFFFFF',
+    },
+    itemDone: {
+        opacity: 0.6,
+        backgroundColor: '#F9F9F9',
     },
     checkBtn: {
         marginRight: 12,
     },
     itemText: {
         flex: 1,
-        color: '#FFF',
+        color: '#1C1C1E',
         fontSize: 16,
-        fontWeight: '500',
+        fontWeight: '600',
     },
     itemTextDone: {
-        color: '#8E8E93',
         textDecorationLine: 'line-through',
+        color: '#8E8E93',
     },
     deleteBtn: {
         padding: 8,
@@ -137,29 +146,40 @@ const styles = StyleSheet.create({
         gap: 16,
     },
     emptyText: {
-        color: '#636366',
-        fontSize: 16,
+        color: '#8E8E93',
+        fontSize: 18,
+        fontWeight: '600',
     },
     inputContainer: {
+        padding: 24,
+        paddingBottom: 40,
+    },
+    inputWrapper: {
         flexDirection: 'row',
         alignItems: 'center',
-        padding: 16,
-        backgroundColor: '#1C1C1E',
-        margin: 20,
-        borderRadius: 30,
-        gap: 12,
+        paddingHorizontal: 16,
+        paddingVertical: 8,
+        backgroundColor: '#FFFFFF',
+        borderRadius: 32,
+        // Soft Shadow
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.1,
+        shadowRadius: 12,
+        elevation: 8,
     },
     input: {
         flex: 1,
-        color: '#FFF',
+        color: '#1C1C1E',
         fontSize: 16,
+        fontWeight: '600',
         paddingVertical: 8,
     },
     addBtn: {
-        width: 40,
-        height: 40,
-        borderRadius: 20,
-        backgroundColor: Colors.dark.primary,
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        backgroundColor: '#4B6EFF', // Primary
         alignItems: 'center',
         justifyContent: 'center',
     },

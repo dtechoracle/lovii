@@ -1,13 +1,14 @@
-import CustomAlert from '@/components/CustomAlert';
 import DrawingViewer from '@/components/DrawingViewer';
+import NoteOptions from '@/components/NoteOptions';
+import ScreenHeader from '@/components/ScreenHeader';
 import { ThemedText } from '@/components/themed-text';
-import { Colors } from '@/constants/theme';
+import { useTheme } from '@/context/ThemeContext';
 import { Note, StorageService } from '@/services/storage';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from 'expo-router';
 import React, { useCallback, useState } from 'react';
 import {
-    Dimensions,
+    Alert,
     FlatList,
     Image,
     RefreshControl,
@@ -16,22 +17,29 @@ import {
     View
 } from 'react-native';
 
-const { width } = Dimensions.get('window');
-const COLUMN_COUNT = 2;
-const ITEM_SIZE = (width - 48) / COLUMN_COUNT;
-
 export default function HistoryScreen() {
+    const { theme } = useTheme();
     const [history, setHistory] = useState<Note[]>([]);
     const [refreshing, setRefreshing] = useState(false);
-    const [alertVisible, setAlertVisible] = useState(false);
     const [selectedNote, setSelectedNote] = useState<Note | null>(null);
+    const [optionsVisible, setOptionsVisible] = useState(false);
 
     const loadHistory = async () => {
-        const myNotes = await StorageService.getMyHistory();
-        const partnerNotes = await StorageService.getPartnerNotes();
+        try {
+            const myNotes = await StorageService.getMyHistory();
+            const partnerNotes = await StorageService.getPartnerNotes();
 
-        const allNotes = [...myNotes, ...partnerNotes].sort((a, b) => b.timestamp - a.timestamp);
-        setHistory(allNotes);
+            // Combine and deduplicate by ID to prevent duplicate keys
+            const allNotes = [...myNotes, ...partnerNotes];
+            const uniqueNotes = Array.from(
+                new Map(allNotes.map(note => [note.id, note])).values()
+            ).sort((a, b) => b.timestamp - a.timestamp);
+
+            setHistory(uniqueNotes);
+        } catch (error) {
+            console.error('History fetch failed', error);
+            setHistory([]);
+        }
     };
 
     useFocusEffect(
@@ -46,136 +54,129 @@ export default function HistoryScreen() {
         setRefreshing(false);
     };
 
-    const handleLongPress = (item: Note) => {
-        setSelectedNote(item);
-        setAlertVisible(true);
+    const handleOptions = (note: Note) => {
+        setSelectedNote(note);
+        setOptionsVisible(true);
     };
 
-    const renderItem = ({ item }: { item: Note }) => {
-        return (
-            <TouchableOpacity
-                style={styles.itemContainer}
-                onLongPress={() => handleLongPress(item)}
-                activeOpacity={0.7}
-            >
-                <View style={styles.card}>
-                    {/* Pin/Bookmark indicators */}
-                    {(item.pinned || item.bookmarked) && (
-                        <View style={styles.indicators}>
-                            {item.pinned && (
-                                <View style={styles.indicator}>
-                                    <Ionicons name="pin" size={14} color="#FFD60A" />
-                                </View>
-                            )}
-                            {item.bookmarked && (
-                                <View style={styles.indicator}>
-                                    <Ionicons name="bookmark" size={14} color="#FFD60A" />
-                                </View>
-                            )}
-                        </View>
-                    )}
+    const handleAction = async (action: 'pin' | 'bookmark' | 'widget' | 'delete', note: Note) => {
+        if (action === 'delete') {
+            Alert.alert(
+                "Delete Note",
+                "Are you sure you want to delete this note?",
+                [
+                    { text: "Cancel", style: "cancel" },
+                    {
+                        text: "Delete",
+                        style: "destructive",
+                        onPress: async () => {
+                            await StorageService.deleteNote(note.id);
+                            await loadHistory();
+                        }
+                    }
+                ]
+            );
+        } else if (action === 'pin') {
+            await StorageService.togglePin(note.id, note.pinned || false);
+            await loadHistory();
+        } else if (action === 'bookmark') {
+            await StorageService.toggleBookmark(note.id, note.bookmarked || false);
+            await loadHistory();
+        } else if (action === 'widget') {
+            await StorageService.sendToWidget(note);
+            Alert.alert("Widget Updated", "This note is now shown on your widget!");
+        }
+    };
 
-                    {item.type === 'text' ? (
-                        <ThemedText style={[styles.noteText, { color: item.color || '#FFF' }]} numberOfLines={3}>
-                            {item.content}
-                        </ThemedText>
-                    ) : item.type === 'collage' && item.images ? (
-                        <View style={styles.collagePreview}>
-                            {item.images.slice(0, 4).map((img, index) => (
-                                <View key={index} style={styles.collageImageWrapper}>
-                                    <Image source={{ uri: img }} style={styles.collageImageItem} resizeMode="cover" />
-                                </View>
-                            ))}
+    const renderItem = ({ item }: { item: Note }) => (
+        <TouchableOpacity
+            activeOpacity={0.8}
+            onLongPress={() => handleOptions(item)}
+            delayLongPress={500}
+            style={styles.cardWrapper}
+        >
+            <View style={styles.card}>
+                <View style={styles.cardHeader}>
+                    <ThemedText style={styles.date}>
+                        {new Date(item.timestamp).toLocaleDateString()}
+                    </ThemedText>
+                    <View style={styles.headerIcons}>
+                        {item.pinned && <Ionicons name="pin" size={12} color="#FFD60A" style={{ marginRight: 4 }} />}
+                        {item.bookmarked && <Ionicons name="bookmark" size={12} color="#FFD60A" style={{ marginRight: 4 }} />}
+
+                        <View style={styles.typeBadge}>
+                            <Ionicons
+                                name={item.type === 'drawing' ? 'brush' : item.type === 'collage' ? 'images' : 'text'}
+                                size={12}
+                                color="#8E8E93"
+                            />
+                            <ThemedText style={styles.typeText}>{item.type}</ThemedText>
                         </View>
-                    ) : (
-                        (() => {
+                    </View>
+                </View>
+
+                {item.type === 'text' && (
+                    <ThemedText style={styles.content} numberOfLines={3}>
+                        {item.content}
+                    </ThemedText>
+                )}
+
+                {item.type === 'drawing' && (
+                    <View style={styles.imageContainer}>
+                        {(() => {
                             try {
-                                const paths = JSON.parse(item.content || '[]');
+                                const paths = JSON.parse(item.content);
                                 return (
                                     <DrawingViewer
                                         paths={paths}
-                                        color={item.color || '#FFF'}
-                                        width={ITEM_SIZE}
-                                        height={ITEM_SIZE}
-                                        strokeWidth={8}
+                                        color={item.color || '#1C1C1E'}
+                                        width={300}
+                                        height={120}
+                                        strokeWidth={3}
                                     />
                                 );
                             } catch (e) {
-                                return (
-                                    <ThemedText style={styles.errorText}>
-                                        Invalid drawing data
-                                    </ThemedText>
-                                );
+                                return <ThemedText style={styles.placeholderText}>Drawing Error</ThemedText>;
                             }
-                        })()
-                    )}
-                </View>
-                <ThemedText style={styles.date}>
-                    {new Date(item.timestamp).toLocaleDateString()}
-                </ThemedText>
-            </TouchableOpacity>
-        );
-    };
+                        })()}
+                    </View>
+                )}
+
+                {item.type === 'collage' && item.images && (
+                    <View style={styles.collageGrid}>
+                        {item.images.slice(0, 4).map((img, index) => (
+                            <Image key={index} source={{ uri: img }} style={styles.collageImage} />
+                        ))}
+                    </View>
+                )}
+            </View>
+        </TouchableOpacity>
+    );
 
     return (
-        <View style={styles.container}>
-            <View style={styles.header}>
-                <ThemedText type="title" style={styles.title}>History</ThemedText>
-            </View>
+        <View style={[styles.container, { backgroundColor: theme.background, paddingTop: 40 }]}>
+            <ScreenHeader title="Timeline" showBack />
             <FlatList
                 data={history}
                 renderItem={renderItem}
-                keyExtractor={item => item.id}
-                numColumns={COLUMN_COUNT}
-                contentContainerStyle={styles.list}
-                columnWrapperStyle={styles.row}
-                refreshControl={<RefreshControl refreshing={refreshing} tintColor={Colors.dark.primary} onRefresh={onRefresh} />}
+                keyExtractor={(item, index) => `${item.id}-${item.timestamp}-${index}-${Math.random()}`}
+                contentContainerStyle={[styles.list, { paddingBottom: 100 }]}
+                refreshControl={
+                    <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+                }
                 ListEmptyComponent={
                     <View style={styles.empty}>
-                        <ThemedText style={styles.emptyText}>No history yet</ThemedText>
+                        <Ionicons name="time-outline" size={64} color="#C7C7CC" />
+                        <ThemedText style={styles.emptyText}>No memories yet</ThemedText>
                     </View>
                 }
             />
 
-            <CustomAlert
-                visible={alertVisible}
-                title="Note Options"
-                message="Choose an action for this note"
-                options={[
-                    {
-                        text: selectedNote?.pinned ? 'Unpin' : 'Pin',
-                        onPress: async () => {
-                            if (selectedNote) {
-                                await StorageService.togglePin(selectedNote.id, selectedNote.pinned || false);
-                                await loadHistory();
-                            }
-                        },
-                    },
-                    {
-                        text: selectedNote?.bookmarked ? 'Remove Bookmark' : 'Bookmark',
-                        onPress: async () => {
-                            if (selectedNote) {
-                                await StorageService.toggleBookmark(selectedNote.id, selectedNote.bookmarked || false);
-                                await loadHistory();
-                            }
-                        },
-                    },
-                    {
-                        text: 'Send to Widget',
-                        onPress: async () => {
-                            if (selectedNote) {
-                                await StorageService.saveMyNote(selectedNote);
-                                await loadHistory();
-                            }
-                        },
-                    },
-                    {
-                        text: 'Cancel',
-                        onPress: () => { },
-                        style: 'cancel',
-                    },
-                ]}
-                onClose={() => setAlertVisible(false)}
+            <NoteOptions
+                visible={optionsVisible}
+                onClose={() => setOptionsVisible(false)}
+                note={selectedNote}
+                onAction={handleAction}
             />
         </View>
     );
@@ -184,98 +185,93 @@ export default function HistoryScreen() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: Colors.dark.background,
-        paddingTop: 60,
-    },
-    header: {
-        paddingHorizontal: 24,
-        marginBottom: 20,
-    },
-    title: {
-        fontSize: 34,
-        fontWeight: '800',
-        color: '#FFF',
+        paddingBottom: 80, // Space for phone's bottom navbar
     },
     list: {
-        paddingHorizontal: 16,
-        paddingBottom: 120,
+        padding: 24,
+        paddingTop: 0,
     },
-    row: {
-        justifyContent: 'space-between',
-    },
-    itemContainer: {
-        marginBottom: 16,
-        width: ITEM_SIZE,
+    cardWrapper: {
+        marginBottom: 20,
     },
     card: {
-        height: ITEM_SIZE,
-        backgroundColor: '#1C1C1E',
-        borderRadius: 20,
-        padding: 12,
-        justifyContent: 'center',
-        alignItems: 'center',
-        overflow: 'hidden',
-        borderWidth: 1,
-        borderColor: '#2C2C2E',
+        backgroundColor: '#FFFFFF',
+        padding: 20,
+        borderRadius: 24,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 8,
+        elevation: 2,
     },
-    noteText: {
-        fontSize: 14,
-        fontWeight: '600',
-        textAlign: 'center',
+    cardHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 12,
+    },
+    headerIcons: {
+        flexDirection: 'row',
+        alignItems: 'center',
     },
     date: {
-        marginTop: 8,
-        fontSize: 12,
         color: '#8E8E93',
-        textAlign: 'center',
+        fontSize: 13,
+        fontWeight: '600',
     },
-    empty: {
-        marginTop: 100,
+    typeBadge: {
+        flexDirection: 'row',
         alignItems: 'center',
-    },
-    emptyText: {
-        color: '#636366',
-        fontSize: 16,
-    },
-    collagePreview: {
-        flexDirection: 'row',
-        flexWrap: 'wrap',
-        gap: 4,
-        width: '100%',
-        height: '100%',
-    },
-    collageImageWrapper: {
-        width: '48%',
-        height: '48%',
+        paddingHorizontal: 8,
+        paddingVertical: 4,
         borderRadius: 8,
-        overflow: 'hidden',
-    },
-    collageImageItem: {
-        width: '100%',
-        height: '100%',
-    },
-    errorText: {
-        color: '#FF3B30',
-        fontSize: 12,
-        textAlign: 'center',
-    },
-    indicators: {
-        position: 'absolute',
-        top: 8,
-        right: 8,
-        flexDirection: 'row',
         gap: 4,
-        zIndex: 10,
+        backgroundColor: '#F2F2F7',
     },
-    indicator: {
-        backgroundColor: 'rgba(0, 0, 0, 0.6)',
-        borderRadius: 12,
-        padding: 4,
-        minWidth: 24,
+    typeText: {
+        fontSize: 11,
+        fontWeight: '600',
+        color: '#8E8E93',
+        textTransform: 'capitalize',
+    },
+    content: {
+        color: '#1C1C1E',
+        fontSize: 16,
+        fontWeight: '500',
+        lineHeight: 24,
+    },
+    imageContainer: {
+        height: 120,
+        backgroundColor: '#F2F2F7',
+        borderRadius: 16,
         alignItems: 'center',
         justifyContent: 'center',
+        overflow: 'hidden',
     },
-    indicatorText: {
+    placeholderText: {
+        color: '#C7C7CC',
+        fontWeight: '600',
         fontSize: 14,
+    },
+    collageGrid: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 8,
+    },
+    collageImage: {
+        width: 60,
+        height: 60,
+        borderRadius: 12,
+        backgroundColor: '#EEE',
+    },
+    empty: {
+        alignItems: 'center',
+        marginTop: 100,
+        gap: 16,
+    },
+    emptyText: {
+        color: '#8E8E93',
+        fontSize: 16,
+        fontWeight: '600',
     },
 });

@@ -43,7 +43,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="history"
         options={{
-          title: 'History',
+          title: 'Timeline',
           tabBarStyle: { display: 'none' }, // Hide tab bar for custom floating bar
           tabBarIcon: ({ color, focused }) => (
             <Ionicons name={focused ? "time" : "time-outline"} size={28} color={color} />

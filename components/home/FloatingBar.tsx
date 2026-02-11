@@ -1,33 +1,36 @@
-import { Colors } from '@/constants/theme';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React from 'react';
 import { StyleSheet, TouchableOpacity, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function FloatingBar() {
     const router = useRouter();
+    const insets = useSafeAreaInsets();
 
     return (
-        <View style={styles.container}>
+        <View style={[styles.container, { paddingBottom: insets.bottom + 20 }]}>
             <View style={styles.bar}>
                 <TouchableOpacity style={styles.iconBtn} onPress={() => router.push('/todo')}>
-                    <Ionicons name="checkbox-outline" size={24} color="#FFF" />
+                    <Ionicons name="checkbox" size={24} color="#8E8E93" />
                 </TouchableOpacity>
 
                 <TouchableOpacity style={styles.iconBtn} onPress={() => router.push('/collage')}>
-                    <Ionicons name="grid-outline" size={24} color="#FFF" />
+                    <Ionicons name="grid" size={24} color="#8E8E93" />
                 </TouchableOpacity>
 
-                <TouchableOpacity style={styles.plusBtn} onPress={() => router.push('/editor')}>
-                    <Ionicons name="add" size={32} color="#000" />
+                <TouchableOpacity activeOpacity={0.8} onPress={() => router.push('/editor')}>
+                    <View style={styles.plusBtn}>
+                        <Ionicons name="add" size={32} color="#FFFFFF" />
+                    </View>
                 </TouchableOpacity>
 
                 <TouchableOpacity style={styles.iconBtn} onPress={() => router.push('/history')}>
-                    <Ionicons name="time-outline" size={24} color="#FFF" />
+                    <Ionicons name="time" size={24} color="#8E8E93" />
                 </TouchableOpacity>
 
                 <TouchableOpacity style={styles.iconBtn} onPress={() => router.push('/connect')}>
-                    <Ionicons name="settings-outline" size={24} color="#FFF" />
+                    <Ionicons name="settings" size={24} color="#8E8E93" />
                 </TouchableOpacity>
             </View>
         </View>
@@ -37,7 +40,7 @@ export default function FloatingBar() {
 const styles = StyleSheet.create({
     container: {
         position: 'absolute',
-        bottom: 40,
+        bottom: 0,
         left: 0,
         right: 0,
         alignItems: 'center',
@@ -47,19 +50,18 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        backgroundColor: 'rgba(28, 28, 30, 0.95)',
-        borderRadius: 40,
+        backgroundColor: '#FFFFFF',
+        borderRadius: 32,
         paddingHorizontal: 24,
         paddingVertical: 12,
         width: '100%',
         height: 80,
-        borderWidth: 1,
-        borderColor: '#2C2C2E',
+        // Soft Shadow
         shadowColor: "#000",
-        shadowOffset: { width: 0, height: 10 },
-        shadowOpacity: 0.3,
-        shadowRadius: 20,
-        elevation: 10,
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.1,
+        shadowRadius: 16,
+        elevation: 8,
     },
     iconBtn: {
         padding: 8,
@@ -68,14 +70,15 @@ const styles = StyleSheet.create({
         width: 64,
         height: 64,
         borderRadius: 32,
-        backgroundColor: Colors.dark.primary, // Yellow
+        backgroundColor: '#4B6EFF', // Soft Blue Primary
         alignItems: 'center',
         justifyContent: 'center',
-        marginBottom: 32, // Pop out effect
-        shadowColor: "#FFD60A",
+        marginBottom: 32, // Pop out
+        // Soft Shadow
+        shadowColor: "#4B6EFF",
         shadowOffset: { width: 0, height: 8 },
         shadowOpacity: 0.3,
         shadowRadius: 16,
-        elevation: 8,
+        elevation: 10,
     },
 });

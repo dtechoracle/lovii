@@ -1,5 +1,6 @@
 import ScreenHeader from '@/components/ScreenHeader';
-import { Colors } from '@/constants/theme';
+import OutlinedCard from '@/components/ui/OutlinedCard';
+import { useTheme } from '@/context/ThemeContext';
 import { Note, StorageService } from '@/services/storage';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
@@ -8,15 +9,16 @@ import React, { useState } from 'react';
 import { Alert, Dimensions, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 const { width } = Dimensions.get('window');
-const IMAGE_SIZE = (width - 48) / 2 - 8; // 2 columns with gaps
+const IMAGE_SIZE = (width - 48) / 2 - 24;
 
 export default function CollageScreen() {
     const router = useRouter();
+    const { theme } = useTheme();
     const [images, setImages] = useState<string[]>([]);
 
     const pickImage = async () => {
         if (images.length >= 4) {
-            Alert.alert("Limit Reached", "You can only select up to 4 images for the widget.");
+            Alert.alert("Limit Reached", "You can only select up to 4 images.");
             return;
         }
 
@@ -41,20 +43,42 @@ export default function CollageScreen() {
     const handleSend = async () => {
         if (images.length === 0) return;
 
-        const note: Note = {
-            id: Date.now().toString(),
-            type: 'collage',
-            content: '', // Empty for collage
-            images: images,
-            timestamp: Date.now(),
-        };
+        // Compress and Convert to Base64
+        const processedImages: string[] = [];
+        try {
+            for (const uri of images) {
+                // Resize to max 800px width to keep payload reasonable
+                const manipulated = await ImageManipulator.manipulateAsync(
+                    uri,
+                    [{ resize: { width: 800 } }],
+                    { compress: 0.7, format: ImageManipulator.SaveFormat.JPEG }
+                );
 
-        await StorageService.saveMyNote(note);
-        router.replace('/');
+                const base64 = await FileSystem.readAsStringAsync(manipulated.uri, {
+                    encoding: FileSystem.EncodingType.Base64,
+                });
+
+                processedImages.push(`data:image/jpeg;base64,${base64}`);
+            }
+
+            const note: Note = {
+                id: Date.now().toString(),
+                type: 'collage',
+                content: '',
+                images: processedImages,
+                timestamp: Date.now(),
+            };
+
+            await StorageService.saveMyNote(note);
+            router.replace('/');
+        } catch (error) {
+            Alert.alert("Error", "Failed to process images. Please try fewer images.");
+            console.error(error);
+        }
     };
 
     return (
-        <View style={styles.container}>
+        <View style={[styles.container, { backgroundColor: theme.background }]}>
             <ScreenHeader
                 title="Create Collage"
                 showBack
@@ -66,28 +90,28 @@ export default function CollageScreen() {
             />
 
             <ScrollView contentContainerStyle={styles.content}>
-                <View style={styles.previewContainer}>
+                <OutlinedCard style={styles.card}>
                     <View style={styles.grid}>
                         {images.map((uri, index) => (
                             <View key={index} style={styles.imageWrapper}>
                                 <Image source={{ uri }} style={styles.image} />
                                 <TouchableOpacity style={styles.removeBtn} onPress={() => removeImage(index)}>
-                                    <Ionicons name="close-circle" size={24} color="#FF3B30" />
+                                    <Ionicons name="close-circle" size={24} color="#FFF" />
                                 </TouchableOpacity>
                             </View>
                         ))}
 
                         {images.length < 4 && (
                             <TouchableOpacity style={styles.addBtn} onPress={pickImage}>
-                                <Ionicons name="add" size={40} color="#3A3A3C" />
+                                <Ionicons name="add" size={32} color="#4B6EFF" />
                                 <Text style={styles.addText}>Add Photo</Text>
                             </TouchableOpacity>
                         )}
                     </View>
-                </View>
+                </OutlinedCard>
 
                 <Text style={styles.hint}>
-                    Select up to 4 photos to display on your partner's widget.
+                    Select up to 4 photos for your partner's widget.
                 </Text>
             </ScrollView>
         </View>
@@ -97,27 +121,26 @@ export default function CollageScreen() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: Colors.dark.background,
         paddingTop: 60,
     },
     sendText: {
-        fontSize: 18,
-        fontWeight: '700',
-        color: Colors.dark.primary,
+        fontSize: 16,
+        fontWeight: '600',
+        color: '#4B6EFF',
     },
     disabledText: {
-        color: '#3A3A3C',
+        opacity: 0.3,
+        color: '#8E8E93',
     },
     content: {
         padding: 24,
     },
-    previewContainer: {
-        backgroundColor: '#1C1C1E',
-        borderRadius: 32,
-        padding: 16,
+    card: {
+        padding: 24,
         marginBottom: 24,
         minHeight: 300,
         justifyContent: 'center',
+        borderRadius: 32,
     },
     grid: {
         flexDirection: 'row',
@@ -128,7 +151,7 @@ const styles = StyleSheet.create({
     imageWrapper: {
         width: IMAGE_SIZE,
         height: IMAGE_SIZE,
-        borderRadius: 16,
+        borderRadius: 20,
         overflow: 'hidden',
         position: 'relative',
     },
@@ -140,27 +163,30 @@ const styles = StyleSheet.create({
         position: 'absolute',
         top: 4,
         right: 4,
-        backgroundColor: 'rgba(0,0,0,0.5)',
+        backgroundColor: 'rgba(0,0,0,0.3)',
         borderRadius: 12,
     },
     addBtn: {
         width: IMAGE_SIZE,
         height: IMAGE_SIZE,
-        borderRadius: 16,
+        borderRadius: 20,
         borderWidth: 2,
-        borderColor: '#2C2C2E',
+        borderColor: '#E5E5EA',
         borderStyle: 'dashed',
         alignItems: 'center',
         justifyContent: 'center',
         gap: 8,
+        backgroundColor: '#FAFAFA',
     },
     addText: {
-        color: '#636366',
+        color: '#4B6EFF',
         fontWeight: '600',
+        fontSize: 14,
     },
     hint: {
         color: '#8E8E93',
         textAlign: 'center',
         fontSize: 14,
+        fontWeight: '400',
     },
 });

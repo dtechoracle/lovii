@@ -1,8 +1,10 @@
+import { useTheme } from '@/context/ThemeContext';
 import { Ionicons } from '@expo/vector-icons';
 import React, { useState } from 'react';
 import { ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import Canvas from './Canvas';
 import ScreenHeader from './ScreenHeader';
+import OutlinedCard from './ui/OutlinedCard';
 
 interface NoteEditorProps {
     onSend: (content: string, type: 'text' | 'drawing', color: string) => void;
@@ -10,17 +12,18 @@ interface NoteEditorProps {
 }
 
 const PALETTE = [
-    '#FFFFFF', // White
-    '#FFD60A', // Yellow (Primary)
+    '#1C1C1E', // Black (Soft)
     '#FF3B30', // Red
     '#FF9500', // Orange
-    '#32D74B', // Green
-    '#64D2FF', // Light Blue
-    '#0A84FF', // Blue
-    '#BF5AF2', // Purple
+    '#FFCC00', // Yellow
+    '#34C759', // Green
+    '#007AFF', // Blue
+    '#5856D6', // Purple
+    '#AF52DE', // Pink
 ];
 
 export default function NoteEditor({ onSend, onCancel }: NoteEditorProps) {
+    const { theme } = useTheme();
     const [mode, setMode] = useState<'text' | 'drawing'>('drawing');
     const [text, setText] = useState('');
     const [paths, setPaths] = useState<string[]>([]);
@@ -35,7 +38,7 @@ export default function NoteEditor({ onSend, onCancel }: NoteEditorProps) {
     };
 
     return (
-        <View style={styles.container}>
+        <View style={[styles.container, { backgroundColor: theme.background }]}>
             <ScreenHeader
                 showBack
                 onBack={onCancel}
@@ -45,13 +48,13 @@ export default function NoteEditor({ onSend, onCancel }: NoteEditorProps) {
                             style={[styles.modeBtn, mode === 'drawing' && styles.activeMode]}
                             onPress={() => setMode('drawing')}
                         >
-                            <Ionicons name="pencil" size={20} color={mode === 'drawing' ? '#000' : '#8E8E93'} />
+                            <Ionicons name="pencil" size={20} color={mode === 'drawing' ? '#FFF' : '#8E8E93'} />
                         </TouchableOpacity>
                         <TouchableOpacity
                             style={[styles.modeBtn, mode === 'text' && styles.activeMode]}
                             onPress={() => setMode('text')}
                         >
-                            <Ionicons name="text" size={20} color={mode === 'text' ? '#000' : '#8E8E93'} />
+                            <Ionicons name="text" size={20} color={mode === 'text' ? '#FFF' : '#8E8E93'} />
                         </TouchableOpacity>
                     </View>
                 }
@@ -63,23 +66,26 @@ export default function NoteEditor({ onSend, onCancel }: NoteEditorProps) {
             />
 
             <View style={styles.editorArea}>
-                {mode === 'text' ? (
-                    <TextInput
-                        style={[styles.textInput, { color: selectedColor }]}
-                        multiline
-                        placeholder="Write a note..."
-                        placeholderTextColor="#636366"
-                        value={text}
-                        onChangeText={setText}
-                        autoFocus
-                    />
-                ) : (
-                    <Canvas
-                        color={selectedColor}
-                        strokeWidth={4}
-                        onPathsChange={setPaths}
-                    />
-                )}
+                <OutlinedCard style={{ flex: 1, padding: 0, overflow: 'hidden', borderRadius: 32 }}>
+                    {mode === 'text' ? (
+                        <TextInput
+                            style={[styles.textInput, { color: selectedColor, backgroundColor: '#FFFFFF' }]}
+                            multiline
+                            placeholder="Write something..."
+                            placeholderTextColor="#C7C7CC"
+                            value={text}
+                            onChangeText={setText}
+                            autoFocus
+                        />
+                    ) : (
+                        <Canvas
+                            color={selectedColor}
+                            strokeWidth={6}
+                            onPathsChange={setPaths}
+                            style={{ backgroundColor: '#FFFFFF', flex: 1 }}
+                        />
+                    )}
+                </OutlinedCard>
             </View>
 
             <View style={styles.colorPicker}>
@@ -104,67 +110,70 @@ export default function NoteEditor({ onSend, onCancel }: NoteEditorProps) {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#000000', // Deep Black
         paddingTop: 60,
     },
     sendBtn: {
-        backgroundColor: '#FFD60A', // Yellow
+        backgroundColor: '#4B6EFF', // Soft Blue
         paddingHorizontal: 16,
-        paddingVertical: 6,
+        paddingVertical: 8,
         borderRadius: 16,
     },
     sendText: {
-        fontSize: 17,
+        fontSize: 14,
         fontWeight: '600',
-        color: '#000', // Black text on Yellow
+        color: '#FFF',
     },
     modeSwitch: {
         flexDirection: 'row',
-        backgroundColor: '#2C2C2E',
-        borderRadius: 8,
-        padding: 2,
+        backgroundColor: '#FFFFFF',
+        borderRadius: 20,
+        padding: 4,
     },
     modeBtn: {
-        padding: 6,
-        borderRadius: 6,
-        width: 40,
+        padding: 8,
+        borderRadius: 16,
+        width: 44,
         alignItems: 'center',
     },
     activeMode: {
-        backgroundColor: '#FFD60A', // Active Yellow
+        backgroundColor: '#4B6EFF',
+        // Shadow for active state
+        shadowColor: "#4B6EFF",
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
+        elevation: 4,
     },
     editorArea: {
         flex: 1,
-        backgroundColor: '#1C1C1E', // Dark Card
         margin: 16,
-        borderRadius: 24,
-        overflow: 'hidden',
-        borderWidth: 1,
-        borderColor: '#2C2C2E',
     },
     textInput: {
         flex: 1,
-        padding: 20,
+        padding: 24,
         fontSize: 24,
+        fontWeight: '600',
         textAlignVertical: 'top',
     },
     colorPicker: {
         padding: 16,
         paddingBottom: 40,
-        backgroundColor: '#1C1C1E',
-        borderTopWidth: 1,
-        borderTopColor: '#2C2C2E',
     },
     colorSwatch: {
-        width: 36,
-        height: 36,
-        borderRadius: 18,
+        width: 44,
+        height: 44,
+        borderRadius: 22,
         marginRight: 12,
         borderWidth: 2,
-        borderColor: 'transparent',
+        borderColor: '#FFF', // White border to pop against BG
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+        elevation: 2,
     },
     selectedSwatch: {
-        borderColor: '#FFF',
-        transform: [{ scale: 1.1 }],
+        transform: [{ scale: 1.2 }],
+        borderColor: '#4B6EFF',
     },
 });

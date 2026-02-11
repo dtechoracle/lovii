@@ -100,6 +100,11 @@
           "projectId": "a0a03da8-f568-4d1d-b878-3ed96319155d"
         }
       }
+    },
+    "extra": {
+      "eas": {
+        "projectId": "a0a03da8-f568-4d1d-b878-3ed96319155d"
+      }
     }
   }
 }

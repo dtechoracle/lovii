@@ -1,28 +1,40 @@
-import FilterChips from '@/components/home/FilterChips';
+import GenderPickerModal from '@/components/GenderPickerModal';
 import FloatingBar from '@/components/home/FloatingBar';
 import GalleryCard from '@/components/home/GalleryCard';
 import TaskCard from '@/components/home/TaskCard';
-import ScreenHeader from '@/components/ScreenHeader';
 import { ThemedText } from '@/components/themed-text';
+import OutlinedCard from '@/components/ui/OutlinedCard';
 import WidgetCard from '@/components/WidgetCard';
-import { Colors } from '@/constants/theme';
+import { useTheme } from '@/context/ThemeContext';
 import { Note, StorageService, UserProfile } from '@/services/storage';
 import { Ionicons } from '@expo/vector-icons';
 import { Link, useFocusEffect, useRouter } from 'expo-router';
-import React, { useCallback, useEffect, useState } from 'react';
-import { RefreshControl, ScrollView, StatusBar, StyleSheet, TouchableOpacity, View } from 'react-native';
+import React, { useCallback, useState } from 'react';
+import { Image, RefreshControl, ScrollView, StatusBar, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
 
 export default function HomeScreen() {
   const router = useRouter();
+  const { theme } = useTheme();
   const [latestNote, setLatestNote] = useState<Note | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [pinnedNotes, setPinnedNotes] = useState<Note[]>([]);
-  const [bookmarkedNotes, setBookmarkedNotes] = useState<Note[]>([]);
+  const [showModal, setShowModal] = useState(false);
 
+  // 1. Load Data & Check Profile
   const loadData = async () => {
-    const p = await StorageService.getProfile();
+    let p = await StorageService.getProfile();
+
+    // Create profile if missing (fallback)
+    if (!p) {
+      p = await StorageService.createProfile();
+    }
     setProfile(p);
+
+    // CRITICAL: Force Modal if gender is missing
+    if (!p.gender) {
+      setShowModal(true);
+    }
 
     // Get the absolute latest note from either me or partner
     const pNotes = await StorageService.getPartnerNotes();
@@ -35,36 +47,10 @@ export default function HomeScreen() {
       setLatestNote(allNotes[0]);
     }
 
-    // Get pinned and bookmarked notes
+    // Get pinned notes
     const pinned = mHistory.filter(n => n.pinned);
-    const bookmarked = mHistory.filter(n => n.bookmarked);
     setPinnedNotes(pinned);
-    setBookmarkedNotes(bookmarked);
   };
-
-  // Initialize profile on first launch
-  useEffect(() => {
-    const initProfile = async () => {
-      let profile = await StorageService.getProfile();
-      if (!profile) {
-        profile = await StorageService.createProfile();
-      }
-      setProfile(profile);
-    };
-    initProfile();
-  }, []);
-
-  // Subscribe to partner's notes
-  useEffect(() => {
-    const subscription = StorageService.subscribeToPartnerNotes((note) => {
-      console.log('New note from partner:', note);
-      loadData(); // Refresh data when partner sends a note
-    });
-
-    return () => {
-      subscription.unsubscribe();
-    };
-  }, []);
 
   useFocusEffect(
     useCallback(() => {
@@ -79,25 +65,33 @@ export default function HomeScreen() {
   }, []);
 
   return (
-    <View style={styles.container}>
-      <StatusBar barStyle="light-content" />
+    <View style={[styles.container, { backgroundColor: theme.background }]}>
+      <StatusBar barStyle="dark-content" />
+
+      {/* Search Bar / Header Mock */}
+      <View style={styles.header}>
+        <View style={styles.searchBar}>
+          <Ionicons name="search" size={20} color="#8E8E93" />
+          <TextInput
+            placeholder="Search notes..."
+            placeholderTextColor="#8E8E93"
+            style={styles.searchInput}
+          />
+        </View>
+        <Link href="/connect" asChild>
+          <TouchableOpacity style={styles.profilePic}>
+            <Ionicons name="person" size={20} color="#FFF" />
+          </TouchableOpacity>
+        </Link>
+      </View>
+
       <ScrollView
         contentContainerStyle={styles.scrollContent}
-        refreshControl={<RefreshControl refreshing={refreshing} tintColor={Colors.dark.primary} />}
+        refreshControl={<RefreshControl refreshing={refreshing} tintColor={theme.tint} />}
       >
-        <ScreenHeader
-          rightAction={
-            <Link href="/connect" asChild>
-              <TouchableOpacity style={styles.profilePic}>
-                <Ionicons name="person" size={20} color="#FFF" />
-              </TouchableOpacity>
-            </Link>
-          }
-        />
-
-        <ThemedText type="title" style={styles.appTitle}>Your Notes</ThemedText>
-
-        <FilterChips />
+        {/* Removed "Hello User" per request */}
+        {/* Helper text only if new */}
+        {!latestNote && <ThemedText style={styles.helperText}>Tap the + below to create your first note.</ThemedText>}
 
         {/* Hero Card - Widget */}
         <WidgetCard
@@ -109,44 +103,45 @@ export default function HomeScreen() {
         {pinnedNotes.length > 0 && (
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
-              <Ionicons name="pin" size={20} color="#FFD60A" />
+              <Ionicons name="pin" size={18} color={theme.tint} />
               <ThemedText type="subtitle" style={styles.sectionTitle}>Pinned</ThemedText>
             </View>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.horizontalScroll}>
               {pinnedNotes.map(note => (
-                <TouchableOpacity key={note.id} style={styles.miniCard}>
-                  <ThemedText style={styles.miniCardText} numberOfLines={2}>
-                    {note.type === 'text' ? note.content : note.type === 'collage' ? '📸 Collage' : '🎨 Drawing'}
-                  </ThemedText>
+                <TouchableOpacity key={note.id} activeOpacity={0.8} style={styles.miniCardWrapper}>
+                  <OutlinedCard style={styles.miniCard}>
+                    {note.type === 'text' && (
+                      <ThemedText style={styles.miniCardText} numberOfLines={3}>
+                        {note.content}
+                      </ThemedText>
+                    )}
+                    {note.type === 'collage' && note.images && note.images.length > 0 && (
+                      <Image
+                        source={{ uri: note.images[0] }}
+                        style={{ width: '100%', height: '100%', borderRadius: 20 }}
+                        resizeMode="cover"
+                      />
+                    )}
+                    {note.type === 'drawing' && (
+                      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+                        <Ionicons name="brush" size={32} color={note.color || theme.tint} />
+                      </View>
+                    )}
+                  </OutlinedCard>
                 </TouchableOpacity>
               ))}
             </ScrollView>
           </View>
         )}
 
-        {/* Bookmarked Notes */}
-        {bookmarkedNotes.length > 0 && (
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <Ionicons name="bookmark" size={20} color="#FFD60A" />
-              <ThemedText type="subtitle" style={styles.sectionTitle}>Bookmarked</ThemedText>
-            </View>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.horizontalScroll}>
-              {bookmarkedNotes.map(note => (
-                <TouchableOpacity key={note.id} style={styles.miniCard}>
-                  <ThemedText style={styles.miniCardText} numberOfLines={2}>
-                    {note.type === 'text' ? note.content : note.type === 'collage' ? '📸 Collage' : '🎨 Drawing'}
-                  </ThemedText>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
+        {/* Features Grid - Soft Style */}
+        <View style={styles.grid}>
+          <View style={styles.gridCol}>
+            <TaskCard />
           </View>
-        )}
-
-        {/* Bento Grid */}
-        <View style={styles.bentoRow}>
-          <TaskCard />
-          <GalleryCard />
+          <View style={styles.gridCol}>
+            <GalleryCard />
+          </View>
         </View>
 
         {/* Bottom Spacer for Floating Bar */}
@@ -155,6 +150,14 @@ export default function HomeScreen() {
       </ScrollView>
 
       <FloatingBar />
+
+      <GenderPickerModal
+        visible={showModal}
+        onSelect={() => {
+          setShowModal(false);
+          loadData(); // Reload to apply theme
+        }}
+      />
     </View>
   );
 }
@@ -162,65 +165,98 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.dark.background,
+    paddingBottom: 80, // Space for phone's bottom navbar
+  },
+  header: {
+    paddingTop: 60,
+    paddingHorizontal: 24,
+    paddingBottom: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+  },
+  searchBar: {
+    flex: 1,
+    height: 44,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 22,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  searchInput: {
+    flex: 1,
+    marginLeft: 8,
+    fontSize: 16,
+    color: '#1C1C1E',
   },
   scrollContent: {
     padding: 24,
-    paddingTop: 60,
+    paddingTop: 8,
   },
-  appTitle: {
-    fontSize: 40,
-    fontWeight: '800',
-    color: '#FFF',
+  helperText: {
+    fontSize: 16,
+    color: '#8E8E93',
+    textAlign: 'center',
     marginBottom: 24,
-    letterSpacing: -0.5,
+    marginTop: -8,
   },
-  bentoRow: {
+  grid: {
     flexDirection: 'row',
     gap: 16,
+    marginTop: 24,
+  },
+  gridCol: {
+    flex: 1,
   },
   profilePic: {
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: '#1C1C1E',
+    backgroundColor: '#4B6EFF', // Soft Blue
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: '#2C2C2E',
   },
   section: {
-    marginBottom: 24,
+    marginTop: 32,
   },
   sectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    marginBottom: 12,
+    marginBottom: 16,
     paddingHorizontal: 4,
   },
   sectionTitle: {
     fontSize: 18,
-    fontWeight: '700',
-    color: '#FFF',
+    fontWeight: '600',
+    color: '#1C1C1E',
   },
   horizontalScroll: {
-    gap: 12,
     paddingHorizontal: 4,
+    paddingBottom: 16, // Space for shadow
+  },
+  miniCardWrapper: {
+    marginRight: 16,
   },
   miniCard: {
-    width: 150,
-    height: 80,
-    backgroundColor: '#1C1C1E',
-    borderRadius: 16,
-    padding: 12,
-    borderWidth: 1,
-    borderColor: '#2C2C2E',
+    width: 140,
+    height: 100,
     justifyContent: 'center',
+    alignItems: 'center',
+    padding: 16,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 24,
   },
   miniCardText: {
     fontSize: 14,
-    color: '#FFF',
-    fontWeight: '600',
+    color: '#1C1C1E',
+    fontWeight: '500',
+    textAlign: 'center',
   },
 });

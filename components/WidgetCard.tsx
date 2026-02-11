@@ -1,8 +1,10 @@
+import { useTheme } from '@/context/ThemeContext';
 import { Note } from '@/services/storage';
 import { Ionicons } from '@expo/vector-icons';
 import React from 'react';
 import { Dimensions, Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import DrawingViewer from './DrawingViewer';
+import OutlinedCard from './ui/OutlinedCard';
 
 interface WidgetCardProps {
     note: Note | null;
@@ -10,17 +12,18 @@ interface WidgetCardProps {
 }
 
 const { width, height } = Dimensions.get('window');
-const CARD_HEIGHT = height * 0.55;
+const CARD_HEIGHT = height * 0.5;
 const CARD_WIDTH = width - 48;
 
 export default function WidgetCard({ note, onPress }: WidgetCardProps) {
+    const { theme } = useTheme();
 
     const renderContent = () => {
         if (!note) {
             return (
                 <View style={styles.emptyState}>
-                    <Ionicons name="heart-outline" size={48} color="#3A3A3C" />
-                    <Text style={styles.emptyText}>Tap to send a note</Text>
+                    <Ionicons name="heart" size={64} color="#FFD1DC" />
+                    <Text style={styles.emptyText}>Tap to send love</Text>
                 </View>
             );
         }
@@ -28,7 +31,7 @@ export default function WidgetCard({ note, onPress }: WidgetCardProps) {
         if (note.type === 'text') {
             return (
                 <View style={styles.textContent}>
-                    <Text style={[styles.noteText, { color: note.color || '#FFF' }]} numberOfLines={8}>
+                    <Text style={[styles.noteText, { color: note.color || '#1C1C1E' }]} numberOfLines={8}>
                         {note.content}
                     </Text>
                 </View>
@@ -47,7 +50,7 @@ export default function WidgetCard({ note, onPress }: WidgetCardProps) {
                 <View style={styles.drawingContent}>
                     <DrawingViewer
                         paths={paths}
-                        color={note.color || '#FFF'}
+                        color={note.color || '#1C1C1E'}
                         width={CARD_WIDTH}
                         height={CARD_HEIGHT - 100}
                     />
@@ -56,7 +59,6 @@ export default function WidgetCard({ note, onPress }: WidgetCardProps) {
         }
 
         if (note.type === 'collage' && note.images) {
-            // Simple 2x2 grid or list depending on count
             return (
                 <View style={styles.collageContainer}>
                     {note.images.slice(0, 4).map((img, index) => (
@@ -71,37 +73,33 @@ export default function WidgetCard({ note, onPress }: WidgetCardProps) {
 
     return (
         <TouchableOpacity activeOpacity={0.9} onPress={onPress}>
-            <View style={styles.card}>
+            <OutlinedCard style={styles.card}>
                 <View style={styles.cardHeader}>
-                    <Text style={styles.cardTitle}>Widget</Text>
-                    <Ionicons name="ellipsis-horizontal" size={20} color="#8E8E93" />
+                    <Text style={styles.cardTitle}>Daily Note</Text>
+                    {/* Updated menu icon color to match theme (Deep Blue) */}
+                    <Ionicons name="ellipsis-horizontal" size={24} color="#4B6EFF" />
                 </View>
 
                 {renderContent()}
 
                 <View style={styles.footer}>
                     <View style={styles.badge}>
-                        <Ionicons name="time-outline" size={14} color="#8E8E93" style={{ marginRight: 4 }} />
+                        <Ionicons name="time" size={14} color="#8E8E93" style={{ marginRight: 4 }} />
                         <Text style={styles.badgeText}>
                             {note ? new Date(note.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Now'}
                         </Text>
                     </View>
                 </View>
-            </View>
+            </OutlinedCard>
         </TouchableOpacity>
     );
 }
 
 const styles = StyleSheet.create({
     card: {
-        backgroundColor: '#000000', // Black background as requested
-        borderRadius: 32,
         height: CARD_HEIGHT,
         padding: 24,
-        overflow: 'hidden',
-        borderWidth: 1,
-        borderColor: '#2C2C2E',
-        marginBottom: 24,
+        borderRadius: 40, // Extra soft
     },
     cardHeader: {
         flexDirection: 'row',
@@ -110,9 +108,9 @@ const styles = StyleSheet.create({
         marginBottom: 16,
     },
     cardTitle: {
-        fontSize: 22,
+        fontSize: 20,
         fontWeight: '700',
-        color: '#FFF',
+        color: '#1C1C1E',
     },
     emptyState: {
         flex: 1,
@@ -121,7 +119,7 @@ const styles = StyleSheet.create({
         gap: 16,
     },
     emptyText: {
-        color: '#636366',
+        color: '#8E8E93',
         fontSize: 18,
         fontWeight: '600',
     },
@@ -131,10 +129,10 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     noteText: {
-        fontSize: 24,
-        fontWeight: '600',
+        fontSize: 28,
+        fontWeight: '700',
         textAlign: 'center',
-        lineHeight: 34,
+        lineHeight: 36,
     },
     drawingContent: {
         flex: 1,
@@ -145,14 +143,14 @@ const styles = StyleSheet.create({
         flex: 1,
         flexDirection: 'row',
         flexWrap: 'wrap',
-        gap: 8,
+        gap: 12,
         justifyContent: 'center',
         alignContent: 'center',
     },
     collageItem: {
-        width: '48%',
-        height: '48%',
-        borderRadius: 12,
+        width: '46%',
+        height: '46%',
+        borderRadius: 20,
         overflow: 'hidden',
     },
     collageImage: {
@@ -170,10 +168,10 @@ const styles = StyleSheet.create({
     badge: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: '#1C1C1E',
+        backgroundColor: '#F2F2F7',
         paddingHorizontal: 12,
         paddingVertical: 6,
-        borderRadius: 12,
+        borderRadius: 16,
     },
     badgeText: {
         color: '#8E8E93',
