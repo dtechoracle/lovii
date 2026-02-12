@@ -44,8 +44,8 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
         }
     };
 
-    // We only have one palette now: Soft
-    const activePalette = Palettes.soft;
+    // Select palette based on gender
+    const activePalette = gender === 'female' ? Palettes.pink : Palettes.soft;
 
     return (
         <ThemeContext.Provider value={{

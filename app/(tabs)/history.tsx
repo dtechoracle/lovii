@@ -1,3 +1,4 @@
+import CustomAlert from '@/components/CustomAlert';
 import DrawingViewer from '@/components/DrawingViewer';
 import NoteOptions from '@/components/NoteOptions';
 import ScreenHeader from '@/components/ScreenHeader';
@@ -5,7 +6,7 @@ import { ThemedText } from '@/components/themed-text';
 import { useTheme } from '@/context/ThemeContext';
 import { Note, StorageService } from '@/services/storage';
 import { Ionicons } from '@expo/vector-icons';
-import { useFocusEffect } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import React, { useCallback, useState } from 'react';
 import {
     Alert,
@@ -19,10 +20,17 @@ import {
 
 export default function HistoryScreen() {
     const { theme } = useTheme();
+    const router = useRouter();
     const [history, setHistory] = useState<Note[]>([]);
     const [refreshing, setRefreshing] = useState(false);
     const [selectedNote, setSelectedNote] = useState<Note | null>(null);
     const [optionsVisible, setOptionsVisible] = useState(false);
+    const [alertConfig, setAlertConfig] = useState<{
+        visible: boolean;
+        title: string;
+        message?: string;
+        options: { text: string; onPress: () => void; style?: 'default' | 'cancel' | 'destructive' }[];
+    }>({ visible: false, title: '', options: [] });
 
     const loadHistory = async () => {
         try {
@@ -83,8 +91,45 @@ export default function HistoryScreen() {
             await StorageService.toggleBookmark(note.id, note.bookmarked || false);
             await loadHistory();
         } else if (action === 'widget') {
-            await StorageService.sendToWidget(note);
-            Alert.alert("Widget Updated", "This note is now shown on your widget!");
+            // Check if partner is connected
+            const profile = await StorageService.getProfile();
+            if (!profile?.connectedPartnerId) {
+                setAlertConfig({
+                    visible: true,
+                    title: 'No Partner Connected',
+                    message: 'Please connect to your partner first before sending notes to their widget.',
+                    options: [
+                        {
+                            text: 'Go to Settings',
+                            onPress: () => router.push('/connect'),
+                            style: 'default'
+                        },
+                        {
+                            text: 'Cancel',
+                            onPress: () => { },
+                            style: 'cancel'
+                        }
+                    ]
+                });
+                return;
+            }
+
+            const result = await StorageService.sendToPartnerWidget(note);
+            if (result.success) {
+                setAlertConfig({
+                    visible: true,
+                    title: 'Sent!',
+                    message: "This note will appear on your partner's widget within 5-10 seconds!",
+                    options: [{ text: 'OK', onPress: () => { setAlertConfig(prev => ({ ...prev, visible: false })) }, style: 'default' }]
+                });
+            } else {
+                setAlertConfig({
+                    visible: true,
+                    title: 'Failed to Send',
+                    message: result.error || 'Could not send to partner\'s widget. Please check your connection.',
+                    options: [{ text: 'OK', onPress: () => { setAlertConfig(prev => ({ ...prev, visible: false })) }, style: 'cancel' }]
+                });
+            }
         }
     };
 
@@ -177,6 +222,14 @@ export default function HistoryScreen() {
                 onClose={() => setOptionsVisible(false)}
                 note={selectedNote}
                 onAction={handleAction}
+            />
+
+            <CustomAlert
+                visible={alertConfig.visible}
+                title={alertConfig.title}
+                message={alertConfig.message}
+                options={alertConfig.options}
+                onClose={() => setAlertConfig({ ...alertConfig, visible: false })}
             />
         </View>
     );

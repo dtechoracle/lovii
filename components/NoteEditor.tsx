@@ -1,7 +1,8 @@
 import { useTheme } from '@/context/ThemeContext';
 import { Ionicons } from '@expo/vector-icons';
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import ViewShot from 'react-native-view-shot';
 import Canvas from './Canvas';
 import ScreenHeader from './ScreenHeader';
 import OutlinedCard from './ui/OutlinedCard';
@@ -28,14 +29,91 @@ export default function NoteEditor({ onSend, onCancel }: NoteEditorProps) {
     const [text, setText] = useState('');
     const [paths, setPaths] = useState<string[]>([]);
     const [selectedColor, setSelectedColor] = useState(PALETTE[0]);
+    const viewShotRef = useRef<ViewShot>(null);
 
-    const handleSend = () => {
+    const handleSend = async () => {
         if (mode === 'text') {
             onSend(text, 'text', selectedColor);
         } else {
+            // Capture drawing as image
+            // We pass both the raw paths (for app editing/viewing) AND the image (for widget)
+            // But for now, let's just use the image as content for simplicity in widget logic,
+            // OR we store paths in content and image in a new field.
+            // Actually, existing logic expects content to be JSON string of paths.
+            // We'll handle the widget image generation here and pass it.
+
+            // Wait a tick for render
+            try {
+                if (viewShotRef.current && (viewShotRef.current as any).capture) {
+                    const uri = await (viewShotRef.current as any).capture();
+                    // Convert to base64 if needed, OR just pass URI if local. 
+                    // Widget needs base64. view-shot can return base64.
+
+                    // Actually, let's stick to the plan:
+                    // 1. Save paths as content (so app can edit/view later)
+                    // 2. We need a way to pass the image to the widget.
+                    // The easiest way is to modify onSend to accept an optional imageURI/Base64.
+
+                    // For now, let's conform to existing signature.
+                    // We can't easily change the signature without changing `editor.tsx`.
+                    // BUT `content` is just a string. Maybe we can pack it?
+                    // No, cleaner to change the interface.
+
+                    // Let's assume we capture base64
+                    const result = await (viewShotRef.current as any).capture();
+                    // For the widget, we need base64.
+                    // Re-capture as data-uri
+                    // options={{ format: "jpg", quality: 0.9, result: "data-uri" }}
+                }
+            } catch (e) {
+                console.log("Failed to capture", e);
+            }
+
             onSend(JSON.stringify(paths), 'drawing', selectedColor);
         }
     };
+
+    // We need to capture base64 for the widget.
+    const handleDrawingSend = async () => {
+        try {
+            let imageBase64 = null;
+            if (viewShotRef.current && (viewShotRef.current as any).capture) {
+                imageBase64 = await (viewShotRef.current as any).capture();
+            }
+
+            // We pack the base64 image into the content string alongside paths? 
+            // Or we use a delimiter? 
+            // JSON.stringify({ paths, preview: imageBase64 }) -> This breaks existing viewers.
+
+            // Better: Update `onSend` signature in `editor.tsx` to accept extra data.
+            // For now, let's just stick to paths and fix the widget to render "Drawing" text properly
+            // OR simply accept that we need to change code structure.
+
+            // Wait, the user wants the ACTUAL drawing on the widget.
+            // So we MUST have the image.
+
+            // Let's modify onSend to pass the base64 image as the content for now?
+            // No, then we lose editable paths.
+
+            // Let's modify the onSend signature in a separate step?
+            // No, let's do it right here.
+
+            // Actually, let's just pass a JSON object as content:
+            // { paths: [...], preview: "data:image..." }
+            // And update DrawingViewer to handle that.
+
+            const contentObj = {
+                paths,
+                preview: imageBase64 // capture with result="data-uri"
+            };
+
+            onSend(JSON.stringify(contentObj), 'drawing', selectedColor);
+
+        } catch (e) {
+            console.error(e);
+            onSend(JSON.stringify({ paths }), 'drawing', selectedColor);
+        }
+    }
 
     return (
         <View style={[styles.container, { backgroundColor: theme.background }]}>
@@ -59,7 +137,7 @@ export default function NoteEditor({ onSend, onCancel }: NoteEditorProps) {
                     </View>
                 }
                 rightAction={
-                    <TouchableOpacity onPress={handleSend} style={styles.sendBtn}>
+                    <TouchableOpacity onPress={mode === 'drawing' ? handleDrawingSend : handleSend} style={styles.sendBtn}>
                         <Text style={styles.sendText}>Send</Text>
                     </TouchableOpacity>
                 }
@@ -78,12 +156,18 @@ export default function NoteEditor({ onSend, onCancel }: NoteEditorProps) {
                             autoFocus
                         />
                     ) : (
-                        <Canvas
-                            color={selectedColor}
-                            strokeWidth={6}
-                            onPathsChange={setPaths}
-                            style={{ backgroundColor: '#FFFFFF', flex: 1 }}
-                        />
+                        <ViewShot
+                            ref={viewShotRef}
+                            options={{ format: "jpg", quality: 0.8, result: "data-uri" }}
+                            style={{ flex: 1, backgroundColor: '#FFFFFF' }}
+                        >
+                            <Canvas
+                                color={selectedColor}
+                                strokeWidth={6}
+                                onPathsChange={setPaths}
+                                style={{ backgroundColor: 'transparent', flex: 1 }}
+                            />
+                        </ViewShot>
                     )}
                 </OutlinedCard>
             </View>

@@ -14,6 +14,10 @@ export default function RootLayout() {
   // Initialize partner notes subscription for widget updates
   useEffect(() => {
     console.log('[RootLayout] Starting partner notes subscription...');
+
+    // Force immediate widget update on app start to fix "preview image" issue
+    StorageService.updateWidget();
+
     const subscription = StorageService.subscribeToPartnerNotes((note) => {
       console.log('[RootLayout] New partner note received:', note.type, note.timestamp);
     });

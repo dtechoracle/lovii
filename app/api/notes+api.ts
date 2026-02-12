@@ -36,6 +36,8 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
     try {
         const body = await request.json();
+        console.log('[API] POST /notes received:', JSON.stringify(body, null, 2));
+
         const [newNote] = await db.insert(notes).values({
             profileId: body.profileId,
             type: body.type,

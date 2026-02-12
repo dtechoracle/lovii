@@ -54,7 +54,7 @@ export default function HistoryScreen() {
             await StorageService.toggleBookmark(note.id, note.bookmarked || false);
             loadHistory();
         } else if (action === 'widget') {
-            await StorageService.sendToWidget(note);
+            await StorageService.sendToPartnerWidget(note);
             Alert.alert("Widget Updated", "This note is now shown on your widget!");
         }
     };

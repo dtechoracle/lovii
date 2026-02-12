@@ -122,11 +122,29 @@ export default function HomeScreen() {
                         resizeMode="cover"
                       />
                     )}
-                    {note.type === 'drawing' && (
-                      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-                        <Ionicons name="brush" size={32} color={note.color || theme.tint} />
-                      </View>
-                    )}
+                    {note.type === 'drawing' && (() => {
+                      let preview: string | null = null;
+                      try {
+                        const parsed = JSON.parse(note.content);
+                        if (parsed.preview) preview = parsed.preview;
+                      } catch (e) { }
+
+                      if (preview) {
+                        return (
+                          <Image
+                            source={{ uri: preview }}
+                            style={{ width: '100%', height: '100%', borderRadius: 20 }}
+                            resizeMode="cover"
+                          />
+                        );
+                      }
+
+                      return (
+                        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+                          <Ionicons name="brush" size={32} color={note.color || theme.tint} />
+                        </View>
+                      );
+                    })()}
                   </OutlinedCard>
                 </TouchableOpacity>
               ))}

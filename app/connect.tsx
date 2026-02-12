@@ -1,3 +1,4 @@
+import CustomAlert from '@/components/CustomAlert';
 import ScreenHeader from '@/components/ScreenHeader';
 import { ThemedText } from '@/components/themed-text';
 import OutlinedCard from '@/components/ui/OutlinedCard';
@@ -17,6 +18,12 @@ export default function ConnectScreen() {
 
     // New Fields
     const [partnerName, setPartnerName] = useState('');
+    const [alertConfig, setAlertConfig] = useState<{
+        visible: boolean;
+        title: string;
+        message?: string;
+        options: { text: string; onPress: () => void; style?: 'default' | 'cancel' | 'destructive' }[];
+    }>({ visible: false, title: '', options: [] });
 
     useEffect(() => {
         loadProfile();
@@ -30,26 +37,68 @@ export default function ConnectScreen() {
         }
         setProfile(p);
         setMyCode(p.partnerCode);
+
+        // Load existing partner connection data
         if (p.partnerName) setPartnerName(p.partnerName);
+        if (p.connectedPartnerCode) setCode(p.connectedPartnerCode); // Load the saved partner code
     };
 
     const handleConnect = async () => {
         if (!profile) return;
+
+        // Validate partner code format (6 characters, alphanumeric)
+        if (code && code.length !== 6) {
+            setAlertConfig({
+                visible: true,
+                title: 'Invalid Partner Code',
+                message: 'Partner code must be exactly 6 characters.',
+                options: [{ text: 'OK', onPress: () => { }, style: 'cancel' }]
+            });
+            return;
+        }
+
         const updatedProfile = { ...profile };
 
         // Save Code/Name logic
-        // We use the optimistic local save from StorageService
-        if (code) updatedProfile.connectedPartnerId = 'partner_' + code;
+        if (code) {
+            updatedProfile.connectedPartnerCode = code; // Save the partner's code
+            updatedProfile.connectedPartnerId = 'partner_' + code; // Temporary until backend responds
+        }
         if (partnerName) updatedProfile.partnerName = partnerName;
 
         await StorageService.saveProfile(updatedProfile);
+        setProfile(updatedProfile); // Update UI immediately
 
         // Try to verify connection (network)
         if (code) {
-            await StorageService.connectToPartner(code);
+            const success = await StorageService.connectToPartner(code);
+            if (!success) {
+                console.log('Connection failed, reverting UI...');
+                setAlertConfig({
+                    visible: true,
+                    title: 'Connection Failed',
+                    message: 'Could not connect to partner. Check the code and try again.',
+                    options: [{
+                        text: 'OK', onPress: () => {
+                            // Optional: Revert profile state locally to remove "Connected" badge?
+                            // For now, keep it simple. User can try again.
+                        }, style: 'cancel'
+                    }]
+                });
+                return;
+            } else {
+                // Refresh profile to get partner details (id, name) from server response
+                const latest = await StorageService.getProfile();
+                if (latest) setProfile(latest);
+            }
         }
 
-        Alert.alert("Success", "Settings updated!", [{ text: "OK", onPress: () => router.back() }]);
+        setAlertConfig({
+            visible: true,
+            title: 'Success',
+            message: 'Settings updated successfully!',
+            options: [{ text: 'OK', onPress: () => router.back(), style: 'default' }]
+        });
     };
 
     const handleShare = async () => {
@@ -106,6 +155,7 @@ export default function ConnectScreen() {
                         maxLength={6}
                     />
 
+
                     <ThemedText type="subtitle" style={styles.label}>Partner Name</ThemedText>
                     <TextInput
                         style={styles.input}
@@ -115,10 +165,23 @@ export default function ConnectScreen() {
                         onChangeText={setPartnerName}
                     />
 
+                    {profile?.connectedPartnerId ? (
+                        <View style={styles.connectedBadge}>
+                            <Ionicons name="checkmark-circle" size={16} color="#34C759" />
+                            <ThemedText style={styles.connectedText}>Connected</ThemedText>
+                        </View>
+                    ) : (
+                        <View style={styles.notConnectedBadge}>
+                            <Ionicons name="close-circle" size={16} color="#FF9500" />
+                            <ThemedText style={styles.notConnectedText}>Not Connected</ThemedText>
+                        </View>
+                    )}
+
                     <TouchableOpacity style={styles.button} onPress={handleConnect}>
                         <ThemedText style={styles.buttonText}>Save Changes</ThemedText>
                     </TouchableOpacity>
                 </OutlinedCard>
+
 
                 {/* Reset Button - Beefed Up */}
                 <TouchableOpacity style={styles.resetBtnWrapper} onPress={handleReset}>
@@ -127,8 +190,61 @@ export default function ConnectScreen() {
                         <ThemedText style={styles.resetText}>Reset Everything</ThemedText>
                     </View>
                 </TouchableOpacity>
-                <Text style={styles.version}>v1.0.2 - Soft Playful</Text>
+
+                {/* Account Recovery */}
+                <View style={styles.divider}>
+                    <View style={styles.line} />
+                    <ThemedText style={styles.or}>Recovery</ThemedText>
+                    <View style={styles.line} />
+                </View>
+
+                <OutlinedCard style={styles.card}>
+                    <ThemedText type="subtitle" style={styles.label}>Restore Account</ThemedText>
+                    <ThemedText style={[styles.hint, { textAlign: 'left', marginBottom: 12 }]}>
+                        Lost your data? Enter your old code to recover your account.
+                    </ThemedText>
+                    <TextInput
+                        style={styles.input}
+                        placeholder="Old Code"
+                        placeholderTextColor="#C7C7CC"
+                        onChangeText={(t) => {
+                            if (t.length === 6) {
+                                Alert.alert(
+                                    "Recover Account?",
+                                    `Attempt to recover account with code ${t}? This will overwrite current data.`,
+                                    [
+                                        { text: "Cancel", style: 'cancel' },
+                                        {
+                                            text: "Recover",
+                                            onPress: async () => {
+                                                const success = await StorageService.recoverProfile(t.toUpperCase());
+                                                if (success) {
+                                                    Alert.alert("Success", "Account recovered! Restarting app...");
+                                                    // Force reload or nav
+                                                    router.replace('/(tabs)');
+                                                } else {
+                                                    Alert.alert("Failed", "Could not find account with that code.");
+                                                }
+                                            }
+                                        }
+                                    ]
+                                )
+                            }
+                        }}
+                        maxLength={6}
+                    />
+                </OutlinedCard>
+
+                <Text style={styles.version}>v1.0.0</Text>
             </ScrollView>
+
+            <CustomAlert
+                visible={alertConfig.visible}
+                title={alertConfig.title}
+                message={alertConfig.message}
+                options={alertConfig.options}
+                onClose={() => setAlertConfig({ ...alertConfig, visible: false })}
+            />
         </View>
     );
 }
@@ -233,19 +349,51 @@ const styles = StyleSheet.create({
         width: '100%',
         shadowColor: "#FF3B30",
         shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.2,
-        shadowRadius: 8,
-        elevation: 4,
+        shadowOpacity: 0.15,
+        shadowRadius: 6,
+        elevation: 3,
     },
     resetText: {
         color: '#FFF',
-        fontWeight: '700',
+        fontWeight: '600',
         fontSize: 16,
+    },
+    connectedBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        marginBottom: 12,
+        paddingVertical: 8,
+        paddingHorizontal: 12,
+        backgroundColor: '#E8F5E9',
+        borderRadius: 12,
+        alignSelf: 'flex-start',
+    },
+    connectedText: {
+        color: '#34C759',
+        fontSize: 14,
+        fontWeight: '600',
+    },
+    notConnectedBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        marginBottom: 12,
+        paddingVertical: 8,
+        paddingHorizontal: 12,
+        backgroundColor: '#FFF3E0',
+        borderRadius: 12,
+        alignSelf: 'flex-start',
+    },
+    notConnectedText: {
+        color: '#FF9500',
+        fontSize: 14,
+        fontWeight: '600',
     },
     version: {
         textAlign: 'center',
-        color: '#C7C7CC',
         fontSize: 12,
-        marginTop: 20,
-    },
+        color: '#8E8E93',
+        marginTop: 24,
+    }
 });

@@ -50,7 +50,7 @@ export default function NoteOptions({ visible, onClose, note, onAction }: NoteOp
 
                             <OptionItem
                                 icon="phone-portrait-outline"
-                                label="Show on Widget"
+                                label="Send to Partner's Widget"
                                 onPress={() => handleAction('widget')}
                             />
 

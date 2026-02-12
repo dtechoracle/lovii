@@ -1,12 +1,12 @@
-import { boolean, integer, jsonb, pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core';
+import { bigint, boolean, jsonb, pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core';
 
 export const profiles = pgTable('profiles', {
     id: uuid('id').defaultRandom().primaryKey(),
     partnerCode: text('partner_code').notNull().unique(),
     name: text('name'),
-    partnerId: uuid('partner_id'), // Self-reference to be handled in application logic or separate foreign key definition if needed, circular deps in simple definitions can be tricky but simple UUID field is fine.
+    partnerId: uuid('partner_id'),
     partnerName: text('partner_name'),
-    anniversary: integer('anniversary'), // using integer for timestamp as BIGINT can handle it but JS Date uses number
+    anniversary: bigint('anniversary', { mode: 'number' }),
     createdAt: timestamp('created_at').defaultNow(),
 });
 
@@ -19,7 +19,7 @@ export const notes = pgTable('notes', {
     images: jsonb('images').$type<string[]>(),
     pinned: boolean('pinned').default(false),
     bookmarked: boolean('bookmarked').default(false),
-    timestamp: integer('timestamp').notNull(), // JS timestamp (ms)
+    timestamp: bigint('timestamp', { mode: 'number' }).notNull(),
     createdAt: timestamp('created_at').defaultNow(),
 });
 

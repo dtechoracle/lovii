@@ -16,6 +16,16 @@ export const Palettes = {
     tint: '#5856D6',
     border: 'transparent',
     shadow: '#000000',
+  },
+  pink: {
+    primary: '#FF4B8B', // Soft Pink
+    secondary: '#FCA5C2', // Light Pink
+    background: '#FFF0F5', // Lavender Blush
+    card: '#FFFFFF',
+    text: '#1C1C1E',
+    tint: '#FF2D70',
+    border: 'transparent',
+    shadow: '#000000',
   }
 };
 

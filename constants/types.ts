@@ -16,6 +16,7 @@ export interface UserProfile {
     name: string;
     partnerCode: string;
     connectedPartnerId?: string;
+    connectedPartnerCode?: string; // The partner's code that was entered
     partnerName?: string;
     anniversary?: number;
     gender?: 'male' | 'female';

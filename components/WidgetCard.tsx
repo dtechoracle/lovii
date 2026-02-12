@@ -40,12 +40,40 @@ export default function WidgetCard({ note, onPress }: WidgetCardProps) {
 
         if (note.type === 'drawing') {
             let paths: string[] = [];
+            let preview: string | null = null;
+
             try {
-                paths = JSON.parse(note.content);
+                const parsed = JSON.parse(note.content);
+                if (Array.isArray(parsed)) {
+                    // Legacy format: just paths
+                    paths = parsed;
+                } else if (parsed.paths) {
+                    // New format: {paths, preview}
+                    paths = parsed.paths;
+                    preview = parsed.preview;
+                }
             } catch (e) {
-                console.error('Failed to parse drawing paths', e);
+                console.error('Failed to parse drawing content', e);
             }
 
+            // If we have a preview image, show it instead of rendering SVG paths
+            if (preview) {
+                return (
+                    <View style={styles.drawingContent}>
+                        <Image
+                            source={{ uri: preview }}
+                            style={{
+                                width: CARD_WIDTH - 48,
+                                height: CARD_HEIGHT - 120,
+                                borderRadius: 20
+                            }}
+                            resizeMode="contain"
+                        />
+                    </View>
+                );
+            }
+
+            // Fallback: render SVG paths
             return (
                 <View style={styles.drawingContent}>
                     <DrawingViewer

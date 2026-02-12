@@ -21,6 +21,14 @@ const KEYS = {
 
 const WIDGET_NAME = 'LoviiWidget';
 
+// Helper for UUID generation
+function generateUUID() {
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
+        var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
+        return v.toString(16);
+    });
+}
+
 export const StorageService = {
     // ==================== Profile ====================
 
@@ -30,9 +38,22 @@ export const StorageService = {
             const localData = await AsyncStorage.getItem(KEYS.PROFILE_DATA);
             const profileId = await AsyncStorage.getItem(KEYS.PROFILE_ID);
 
-            // If we have full local data, return it immediately
+            // MIGRATION: Fix any ID that is NOT a valid UUID
+            const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+            // If we have full local data, validate ID
             if (localData) {
                 const parsed = JSON.parse(localData);
+
+                if (parsed.id && !uuidRegex.test(parsed.id)) {
+                    console.log('[Migration] Converting invalid ID "' + parsed.id + '" to valid UUID...');
+                    parsed.id = generateUUID();
+                    // Save immediately to persist the new UUID
+                    await this.saveProfile(parsed);
+                    // Return here, because saveProfile will trigger sync
+                    return parsed;
+                }
+
                 // Background Sync
                 this.syncProfile(parsed.id).catch(e => console.log('Background sync failed:', e));
                 return parsed;
@@ -40,6 +61,13 @@ export const StorageService = {
 
             // If we only have ID but no data object (migration case), try fetching
             if (profileId) {
+                // If ID is invalid, we can't sync or use it. Dropping it.
+                if (!uuidRegex.test(profileId)) {
+                    console.log('[Migration] Dropping invalid legacy ID:', profileId);
+                    await AsyncStorage.removeItem(KEYS.PROFILE_ID);
+                    return null; // Will trigger createProfile flow if handled by caller
+                }
+
                 const synced = await this.syncProfile(profileId);
                 if (synced) return synced;
 
@@ -91,6 +119,7 @@ export const StorageService = {
         }
     },
 
+
     async updateLocalGender(gender: 'male' | 'female'): Promise<void> {
         await AsyncStorage.setItem(KEYS.THEME_GENDER, gender);
         // Update cached profile object too
@@ -98,6 +127,31 @@ export const StorageService = {
         if (p) {
             p.gender = gender;
             await this.saveProfile(p);
+        }
+    },
+
+    async recoverProfile(code: string): Promise<boolean> {
+        try {
+            // Attempt to find profile by code
+            const res = await fetch(`${API_URL}/recover?code=${code}`);
+            if (!res.ok) return false;
+
+            const data = await res.json();
+            if (!data || !data.profile) return false;
+
+            const profile = data.profile;
+
+            // Rehydrate Local Storage
+            await AsyncStorage.setItem(KEYS.PROFILE_DATA, JSON.stringify(profile));
+            await AsyncStorage.setItem(KEYS.PROFILE_ID, profile.id);
+            if (profile.partnerCode) await AsyncStorage.setItem(KEYS.PROFILE_CODE, profile.partnerCode);
+            if (profile.connectedPartnerId) await AsyncStorage.setItem(KEYS.PARTNER_ID, profile.connectedPartnerId);
+            if (profile.gender) await AsyncStorage.setItem(KEYS.THEME_GENDER, profile.gender);
+
+            return true;
+        } catch (error) {
+            console.error('Recovery failed', error);
+            return false;
         }
     },
 
@@ -143,12 +197,29 @@ export const StorageService = {
             if (profile.connectedPartnerId) await AsyncStorage.setItem(KEYS.PARTNER_ID, profile.connectedPartnerId);
             if (profile.gender) await AsyncStorage.setItem(KEYS.THEME_GENDER, profile.gender);
 
-            // 2. Sync with Backend (Fire & Forget)
-            fetch(`${API_URL}/profile`, {
+            // 2. Sync with Backend (Await this now to ensure DB consistency)
+            console.log('[saveProfile] Syncing to backend...');
+            const response = await fetch(`${API_URL}/profile`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(profile),
-            }).catch(e => console.log('Background save profile failed:', e));
+            });
+
+            if (!response.ok) {
+                console.error('[saveProfile] Sync failed:', response.status);
+            } else {
+                console.log('[saveProfile] Sync success');
+                const serverProfile = await response.json();
+
+                // If server assigned a new ID (UUID migration), update local storage
+                if (serverProfile && serverProfile.id && serverProfile.id !== profile.id) {
+                    console.log('[saveProfile] Updating local ID to:', serverProfile.id);
+                    // Update the object in memory/storage
+                    profile.id = serverProfile.id;
+                    await AsyncStorage.setItem(KEYS.PROFILE_ID, profile.id);
+                    await AsyncStorage.setItem(KEYS.PROFILE_DATA, JSON.stringify(profile));
+                }
+            }
 
         } catch (error) {
             console.error('saveProfile error:', error);
@@ -176,15 +247,20 @@ export const StorageService = {
                 if (data.success) {
                     if (p) {
                         p.connectedPartnerId = data.partnerId;
+                        p.partnerName = data.partnerName || p.partnerName;
+                        // Persist the verified connection
                         await this.saveProfile(p);
                     }
                     return true;
                 }
             }
+            return false;
         } catch (error) {
-            // ignore, optimistic update sticks
+            console.error('connectToPartner error:', error);
+            // Revert optimistic update if needed, but for now just return false
+            // Ideally we should reload profile from server to sync state
+            return false;
         }
-        return true;
     },
 
     // ==================== Notes ====================
@@ -381,18 +457,90 @@ export const StorageService = {
         await AsyncStorage.clear();
     },
 
-    async sendToWidget(note: Note): Promise<void> {
-        requestWidgetUpdate({
-            widgetName: WIDGET_NAME,
-            renderWidget: () => (
-                <AndroidWidget
-                    content={note.content}
-                    type={note.type}
-                    timestamp={note.timestamp}
-                    color={note.color}
-                />
-            ),
-            widgetNotFound: () => { }
-        });
+    async sendToPartnerWidget(note: Note): Promise<{ success: boolean; error?: string }> {
+        try {
+            const profileId = await AsyncStorage.getItem(KEYS.PROFILE_ID);
+            if (!profileId) {
+                console.error('[sendToPartnerWidget] No profile ID found');
+                return { success: false, error: 'No profile ID found. Please restart the app.' };
+            }
+
+            console.log('[sendToPartnerWidget] Profile ID:', profileId);
+            console.log('[sendToPartnerWidget] API URL:', API_URL);
+
+            // 1. Save locally so it shows in MY app's WidgetCard
+            const localNotesJson = await AsyncStorage.getItem(KEYS.LOCAL_NOTES);
+            const localNotes: Note[] = localNotesJson ? JSON.parse(localNotesJson) : [];
+            const updatedNotes = [note, ...localNotes];
+            await AsyncStorage.setItem(KEYS.LOCAL_NOTES, JSON.stringify(updatedNotes));
+
+            // 2. Send to backend so partner can fetch it
+            console.log('[sendToPartnerWidget] Sending to backend...');
+            const response = await fetch(`${API_URL}/notes?profileId=${profileId}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    profileId, // THIS IS MY ID (sending in both body and query to be safe)
+                    ...note
+                }),
+            });
+
+            if (!response.ok) {
+                const status = response.status;
+                const errorText = await response.text();
+                console.error('[sendToPartnerWidget] Backend error:', status, errorText);
+                return { success: false, error: `Server Error (${status}): ${errorText.slice(0, 50)}` };
+            }
+
+            console.log('[sendToPartnerWidget] Successfully sent to backend');
+            return { success: true };
+        } catch (error) {
+            console.error('[sendToPartnerWidget] Exception:', error);
+            if (error instanceof TypeError && error.message.includes('Network request failed')) {
+                return { success: false, error: 'Network Error: Check internet connection.' };
+            }
+            return { success: false, error: String(error) };
+        }
+    },
+
+    // Force update the widget with current state (useful for app start)
+    async updateWidget() {
+        try {
+            const latestNote = await this.getLatestPartnerNote();
+            const partnerNotes = await this.getPartnerNotes();
+
+            // Simple streak calc for local update
+            // (We could import the one from task handler but let's keep it simple here or duplicate for safety)
+            const streak = 0; // The widget task handler will re-calc this anyway when triggered
+
+            requestWidgetUpdate({
+                widgetName: WIDGET_NAME,
+                renderWidget: () => {
+                    if (!latestNote) {
+                        return (
+                            <AndroidWidget
+                                content=""
+                                type="text"
+                                timestamp={Date.now()}
+                                hasPartnerNote={false}
+                            />
+                        );
+                    }
+                    return (
+                        <AndroidWidget
+                            content={latestNote.content}
+                            type={latestNote.type}
+                            timestamp={latestNote.timestamp}
+                            color={latestNote.color}
+                            streak={streak} // 0 here, but task handler will fix it on next run
+                            hasPartnerNote={true}
+                        />
+                    );
+                },
+                widgetNotFound: () => { }
+            });
+        } catch (e) {
+            console.error('Failed to update widget:', e);
+        }
     }
 };
