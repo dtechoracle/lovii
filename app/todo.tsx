@@ -128,6 +128,8 @@ export default function TodoScreen() {
                         value={newTask}
                         onChangeText={setNewTask}
                         onSubmitEditing={handleAddTask}
+                        autoCapitalize="sentences"
+                        autoCorrect={true}
                     />
                     <TouchableOpacity style={styles.addBtn} onPress={handleAddTask}>
                         <Ionicons name="arrow-up" size={20} color="#FFF" />

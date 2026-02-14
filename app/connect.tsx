@@ -220,6 +220,8 @@ export default function ConnectScreen() {
                         placeholderTextColor="#C7C7CC"
                         value={partnerName}
                         onChangeText={setPartnerName}
+                        autoCapitalize="words"
+                        autoCorrect={true}
                     />
 
                     {profile?.connectedPartnerId ? (

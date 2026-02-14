@@ -154,6 +154,8 @@ export default function NoteEditor({ onSend, onCancel }: NoteEditorProps) {
                             value={text}
                             onChangeText={setText}
                             autoFocus
+                            autoCapitalize="sentences"
+                            autoCorrect={true}
                         />
                     ) : (
                         <ViewShot

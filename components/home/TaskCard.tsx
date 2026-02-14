@@ -78,6 +78,8 @@ export default function TaskCard() {
                         value={newTask}
                         onChangeText={setNewTask}
                         onSubmitEditing={handleAddTask}
+                        autoCapitalize="sentences"
+                        autoCorrect={true}
                     />
                     <TouchableOpacity onPress={handleAddTask}>
                         <Ionicons name="add-circle" size={28} color={theme.primary} />
