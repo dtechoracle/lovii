@@ -130,6 +130,30 @@ export const StorageService = {
         }
     },
 
+    async updateThemePreference(preference: 'ocean' | 'sunset' | 'lavender' | 'mint' | 'auto'): Promise<void> {
+        const p = await this.getProfile();
+        if (p) {
+            p.themePreference = preference;
+            await this.saveProfile(p);
+        }
+    },
+
+    async updateThemeMode(mode: 'light' | 'dark' | 'auto'): Promise<void> {
+        const p = await this.getProfile();
+        if (p) {
+            p.themeMode = mode;
+            await this.saveProfile(p);
+        }
+    },
+
+    async updateAvatar(uri: string): Promise<void> {
+        const p = await this.getProfile();
+        if (p) {
+            p.avatarUri = uri;
+            await this.saveProfile(p);
+        }
+    },
+
     async recoverProfile(code: string): Promise<boolean> {
         try {
             // Attempt to find profile by code

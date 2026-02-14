@@ -1,58 +1,83 @@
 import { Palettes } from '@/constants/theme';
+import { ThemeMode, ThemePreference } from '@/constants/types';
 import { StorageService } from '@/services/storage';
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { useColorScheme } from 'react-native';
 
-type ThemeType = 'light' | 'dark';
-type GenderType = 'male' | 'female' | null;
-
 interface ThemeContextType {
-    theme: typeof Palettes.soft;
-    gender: GenderType;
-    setGender: (g: GenderType) => void;
+    theme: typeof Palettes.ocean.light;
+    themePreference: ThemePreference;
+    themeMode: ThemeMode;
     isDark: boolean;
+    setThemePreference: (preference: ThemePreference) => Promise<void>;
+    setThemeMode: (mode: ThemeMode) => Promise<void>;
 }
 
 const ThemeContext = createContext<ThemeContextType>({
-    theme: Palettes.soft,
-    gender: null,
-    setGender: () => { },
-    isDark: false, // Soft is Light Mode
+    theme: Palettes.ocean.light,
+    themePreference: 'ocean',
+    themeMode: 'auto',
+    isDark: false,
+    setThemePreference: async () => { },
+    setThemeMode: async () => { },
 });
 
 export const useTheme = () => useContext(ThemeContext);
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
     const systemScheme = useColorScheme();
-    const [gender, setGender] = useState<GenderType>(null);
+    const [themePreference, setThemePreferenceState] = useState<ThemePreference>('ocean');
+    const [themeMode, setThemeModeState] = useState<ThemeMode>('auto');
 
     useEffect(() => {
-        loadGender();
+        loadThemePreferences();
     }, []);
 
-    const loadGender = async () => {
+    const loadThemePreferences = async () => {
         const profile = await StorageService.getProfile();
-        if (profile?.gender) {
-            setGender(profile.gender);
+        
+        // Migration: Convert old gender-based themes to new system
+        if (profile?.gender && !profile?.themePreference) {
+            const migratedTheme: ThemePreference = profile.gender === 'female' ? 'sunset' : 'ocean';
+            setThemePreferenceState(migratedTheme);
+            await StorageService.updateThemePreference(migratedTheme);
+        } else if (profile?.themePreference) {
+            setThemePreferenceState(profile.themePreference);
+        }
+
+        if (profile?.themeMode) {
+            setThemeModeState(profile.themeMode);
         }
     };
 
-    const handleSetGender = async (g: GenderType) => {
-        setGender(g);
-        if (g) {
-            await StorageService.updateLocalGender(g);
-        }
+    const setThemePreference = async (preference: ThemePreference) => {
+        setThemePreferenceState(preference);
+        await StorageService.updateThemePreference(preference);
     };
 
-    // Select palette based on gender
-    const activePalette = gender === 'female' ? Palettes.pink : Palettes.soft;
+    const setThemeMode = async (mode: ThemeMode) => {
+        setThemeModeState(mode);
+        await StorageService.updateThemeMode(mode);
+    };
+
+    // Determine if dark mode should be active
+    const isDark = themeMode === 'dark' || (themeMode === 'auto' && systemScheme === 'dark');
+
+    // Select the appropriate theme palette
+    const getActivePalette = () => {
+        const paletteKey = themePreference === 'auto' ? 'ocean' : themePreference;
+        const palette = Palettes[paletteKey];
+        return isDark ? palette.dark : palette.light;
+    };
 
     return (
         <ThemeContext.Provider value={{
-            theme: activePalette,
-            gender,
-            setGender: handleSetGender,
-            isDark: false // Force light for soft theme
+            theme: getActivePalette(),
+            themePreference,
+            themeMode,
+            isDark,
+            setThemePreference,
+            setThemeMode,
         }}>
             {children}
         </ThemeContext.Provider>

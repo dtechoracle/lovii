@@ -1,8 +1,8 @@
-import GenderPickerModal from '@/components/GenderPickerModal';
 import FloatingBar from '@/components/home/FloatingBar';
 import GalleryCard from '@/components/home/GalleryCard';
 import TaskCard from '@/components/home/TaskCard';
 import { ThemedText } from '@/components/themed-text';
+import ThemePickerModal from '@/components/ThemePickerModal';
 import OutlinedCard from '@/components/ui/OutlinedCard';
 import WidgetCard from '@/components/WidgetCard';
 import { useTheme } from '@/context/ThemeContext';
@@ -14,12 +14,15 @@ import { Image, RefreshControl, ScrollView, StatusBar, StyleSheet, TextInput, To
 
 export default function HomeScreen() {
   const router = useRouter();
-  const { theme } = useTheme();
+  const { theme, themePreference } = useTheme();
   const [latestNote, setLatestNote] = useState<Note | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [pinnedNotes, setPinnedNotes] = useState<Note[]>([]);
   const [showModal, setShowModal] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<Note[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
 
   // 1. Load Data & Check Profile
   const loadData = async () => {
@@ -31,8 +34,8 @@ export default function HomeScreen() {
     }
     setProfile(p);
 
-    // CRITICAL: Force Modal if gender is missing
-    if (!p.gender) {
+    // CRITICAL: Force Modal if theme preference is missing (migration from gender)
+    if (!p.themePreference && !p.gender) {
       setShowModal(true);
     }
 
@@ -52,6 +55,51 @@ export default function HomeScreen() {
     setPinnedNotes(pinned);
   };
 
+  // Search functionality
+  const handleSearch = async (query: string) => {
+    setSearchQuery(query);
+    
+    if (!query.trim()) {
+      setIsSearching(false);
+      setSearchResults([]);
+      return;
+    }
+
+    setIsSearching(true);
+    const pNotes = await StorageService.getPartnerNotes();
+    const mHistory = await StorageService.getMyHistory();
+    const allNotes = [...pNotes, ...mHistory];
+
+    const results = allNotes.filter(note => {
+      const searchLower = query.toLowerCase();
+      
+      // Search in text content
+      if (note.type === 'text' && note.content.toLowerCase().includes(searchLower)) {
+        return true;
+      }
+
+      // Search in note type
+      if (note.type.toLowerCase().includes(searchLower)) {
+        return true;
+      }
+
+      // Search in color
+      if (note.color && note.color.toLowerCase().includes(searchLower)) {
+        return true;
+      }
+
+      // Search by date
+      const dateStr = new Date(note.timestamp).toLocaleDateString().toLowerCase();
+      if (dateStr.includes(searchLower)) {
+        return true;
+      }
+
+      return false;
+    }).sort((a, b) => b.timestamp - a.timestamp);
+
+    setSearchResults(results);
+  };
+
   useFocusEffect(
     useCallback(() => {
       loadData();
@@ -68,19 +116,30 @@ export default function HomeScreen() {
     <View style={[styles.container, { backgroundColor: theme.background }]}>
       <StatusBar barStyle="dark-content" />
 
-      {/* Search Bar / Header Mock */}
+      {/* Search Bar / Header */}
       <View style={styles.header}>
-        <View style={styles.searchBar}>
-          <Ionicons name="search" size={20} color="#8E8E93" />
+        <View style={[styles.searchBar, { backgroundColor: theme.card }]}>
+          <Ionicons name="search" size={20} color={theme.textSecondary} />
           <TextInput
             placeholder="Search notes..."
-            placeholderTextColor="#8E8E93"
-            style={styles.searchInput}
+            placeholderTextColor={theme.textSecondary}
+            style={[styles.searchInput, { color: theme.text }]}
+            value={searchQuery}
+            onChangeText={handleSearch}
           />
+          {searchQuery.length > 0 && (
+            <TouchableOpacity onPress={() => handleSearch('')}>
+              <Ionicons name="close-circle" size={20} color={theme.textSecondary} />
+            </TouchableOpacity>
+          )}
         </View>
         <Link href="/connect" asChild>
-          <TouchableOpacity style={styles.profilePic}>
-            <Ionicons name="person" size={20} color="#FFF" />
+          <TouchableOpacity style={[styles.profilePic, { backgroundColor: theme.primary }]}>
+            {profile?.avatarUri ? (
+              <Image source={{ uri: profile.avatarUri }} style={styles.avatar} />
+            ) : (
+              <Ionicons name="person" size={20} color="#FFF" />
+            )}
           </TouchableOpacity>
         </Link>
       </View>
