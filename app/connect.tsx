@@ -20,6 +20,8 @@ export default function ConnectScreen() {
     const [partnerName, setPartnerName] = useState('');
     const [avatarUri, setAvatarUri] = useState<string | null>(null);
     const [showThemePicker, setShowThemePicker] = useState(false);
+    const [isConnecting, setIsConnecting] = useState(false);
+    const [connectionStatus, setConnectionStatus] = useState<'none' | 'connecting' | 'connected' | 'failed'>('none');
     const [alertConfig, setAlertConfig] = useState<{
         visible: boolean;
         title: string;
@@ -43,6 +45,14 @@ export default function ConnectScreen() {
         if (p.partnerName) setPartnerName(p.partnerName);
         if (p.connectedPartnerCode) setCode(p.connectedPartnerCode);
         if (p.avatarUri) setAvatarUri(p.avatarUri);
+        
+        // Set initial connection status based on whether we have a verified partner ID
+        // A real partner ID won't start with 'partner_' (that's just a temporary placeholder)
+        if (p.partnerId && !p.partnerId.startsWith('partner_')) {
+            setConnectionStatus('connected');
+        } else {
+            setConnectionStatus('none');
+        }
     };
 
     const handlePickImage = async () => {
@@ -73,59 +83,94 @@ export default function ConnectScreen() {
     const handleConnect = async () => {
         if (!profile) return;
 
-        // Validate partner code format (6 characters, alphanumeric)
-        if (code && code.length !== 6) {
-            setAlertConfig({
-                visible: true,
-                title: 'Invalid Partner Code',
-                message: 'Partner code must be exactly 6 characters.',
-                options: [{ text: 'OK', onPress: () => { }, style: 'cancel' }]
-            });
-            return;
-        }
+        setIsConnecting(true);
+        setConnectionStatus('connecting');
 
-        const updatedProfile = { ...profile };
+        try {
+            // Save partner name if provided (can be updated anytime)
+            if (partnerName && partnerName !== profile.partnerName) {
+                const updatedProfile = { ...profile, partnerName };
+                await StorageService.saveProfile(updatedProfile);
+                setProfile(updatedProfile);
+            }
 
-        // Save Code/Name logic
-        if (code) {
-            updatedProfile.connectedPartnerCode = code; // Save the partner's code
-            updatedProfile.connectedPartnerId = 'partner_' + code; // Temporary until backend responds
-        }
-        if (partnerName) updatedProfile.partnerName = partnerName;
+            // Handle partner code connection (only if code is provided)
+            if (code) {
+                // Validate partner code format (6 characters, alphanumeric)
+                if (code.length !== 6) {
+                    setAlertConfig({
+                        visible: true,
+                        title: 'Invalid Partner Code',
+                        message: 'Partner code must be exactly 6 characters.',
+                        options: [{ text: 'OK', onPress: () => { }, style: 'cancel' }]
+                    });
+                    setConnectionStatus('failed');
+                    setIsConnecting(false);
+                    return;
+                }
 
-        await StorageService.saveProfile(updatedProfile);
-        setProfile(updatedProfile); // Update UI immediately
+                // Try to connect to partner
+                const success = await StorageService.connectToPartner(code);
+                
+                if (!success) {
+                    console.log('Connection failed');
+                    setConnectionStatus('failed');
+                    setAlertConfig({
+                        visible: true,
+                        title: 'Connection Failed',
+                        message: 'Could not find a partner with that code. Please check the code and try again.',
+                        options: [{
+                            text: 'OK', 
+                            onPress: () => {
+                                setCode(''); // Clear the invalid code
+                            }, 
+                            style: 'cancel'
+                        }]
+                    });
+                    setIsConnecting(false);
+                    return;
+                }
 
-        // Try to verify connection (network)
-        if (code) {
-            const success = await StorageService.connectToPartner(code);
-            if (!success) {
-                console.log('Connection failed, reverting UI...');
+                // Success! Refresh profile to get partner details
+                const latest = await StorageService.getProfile();
+                if (latest) {
+                    setProfile(latest);
+                    setConnectionStatus('connected');
+                }
+
                 setAlertConfig({
                     visible: true,
-                    title: 'Connection Failed',
-                    message: 'Could not connect to partner. Check the code and try again.',
-                    options: [{
-                        text: 'OK', onPress: () => {
-                            // Optional: Revert profile state locally to remove "Connected" badge?
-                            // For now, keep it simple. User can try again.
-                        }, style: 'cancel'
+                    title: '🎉 Connected!',
+                    message: `You're now connected to ${latest?.partnerName || 'your partner'}!`,
+                    options: [{ 
+                        text: 'OK', 
+                        onPress: () => {
+                            setCode(''); // Clear the code input after successful connection
+                        }, 
+                        style: 'cancel' 
                     }]
                 });
-                return;
-            } else {
-                // Refresh profile to get partner details (id, name) from server response
-                const latest = await StorageService.getProfile();
-                if (latest) setProfile(latest);
+            } else if (partnerName) {
+                // Only partner name was updated, no code
+                setAlertConfig({
+                    visible: true,
+                    title: 'Saved!',
+                    message: 'Partner name updated.',
+                    options: [{ text: 'OK', onPress: () => { }, style: 'cancel' }]
+                });
             }
+        } catch (error) {
+            console.error('Connection error:', error);
+            setConnectionStatus('failed');
+            setAlertConfig({
+                visible: true,
+                title: 'Error',
+                message: 'Something went wrong. Please try again.',
+                options: [{ text: 'OK', onPress: () => { }, style: 'cancel' }]
+            });
+        } finally {
+            setIsConnecting(false);
         }
-
-        setAlertConfig({
-            visible: true,
-            title: 'Success',
-            message: 'Settings updated successfully!',
-            options: [{ text: 'OK', onPress: () => router.back(), style: 'default' }]
-        });
     };
 
     const handleShare = async () => {
@@ -224,10 +269,15 @@ export default function ConnectScreen() {
                         autoCorrect={true}
                     />
 
-                    {profile?.connectedPartnerId ? (
+                    {connectionStatus === 'connected' ? (
                         <View style={styles.connectedBadge}>
                             <Ionicons name="checkmark-circle" size={16} color="#34C759" />
-                            <ThemedText style={styles.connectedText}>Connected</ThemedText>
+                            <ThemedText style={styles.connectedText}>Connected to {profile?.partnerName || 'Partner'}</ThemedText>
+                        </View>
+                    ) : connectionStatus === 'connecting' ? (
+                        <View style={styles.notConnectedBadge}>
+                            <Ionicons name="sync" size={16} color="#007AFF" />
+                            <ThemedText style={[styles.notConnectedText, { color: '#007AFF' }]}>Connecting...</ThemedText>
                         </View>
                     ) : (
                         <View style={styles.notConnectedBadge}>
@@ -236,8 +286,14 @@ export default function ConnectScreen() {
                         </View>
                     )}
 
-                    <TouchableOpacity style={styles.button} onPress={handleConnect}>
-                        <ThemedText style={styles.buttonText}>Save Changes</ThemedText>
+                    <TouchableOpacity 
+                        style={[styles.button, isConnecting && styles.buttonDisabled]} 
+                        onPress={handleConnect}
+                        disabled={isConnecting}
+                    >
+                        <ThemedText style={styles.buttonText}>
+                            {isConnecting ? 'Connecting...' : 'Save Changes'}
+                        </ThemedText>
                     </TouchableOpacity>
                 </OutlinedCard>
 
@@ -392,6 +448,10 @@ const styles = StyleSheet.create({
         shadowOpacity: 0.2,
         shadowRadius: 8,
         elevation: 4,
+    },
+    buttonDisabled: {
+        backgroundColor: '#B0B0B0',
+        shadowOpacity: 0.1,
     },
     buttonText: {
         color: '#FFF',

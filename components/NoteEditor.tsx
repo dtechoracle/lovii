@@ -23,11 +23,33 @@ const PALETTE = [
     '#AF52DE', // Pink
 ];
 
+// Cross-platform fonts that work on both iOS and Android
 const FONTS = [
-    { name: 'Default', value: 'System' },
-    { name: 'Serif', value: 'serif' },
-    { name: 'Monospace', value: 'monospace' },
-    { name: 'Cursive', value: 'Courier' },
+    {
+        name: 'Default',
+        value: Platform.OS === 'ios' ? 'System' : 'Roboto',
+        fallback: undefined // Use system default
+    },
+    {
+        name: 'Serif',
+        value: Platform.OS === 'ios' ? 'Georgia' : 'serif',
+        fallback: 'serif'
+    },
+    {
+        name: 'Monospace',
+        value: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+        fallback: 'monospace'
+    },
+    {
+        name: 'Cursive',
+        value: Platform.OS === 'ios' ? 'Snell Roundhand' : 'cursive',
+        fallback: 'cursive'
+    },
+    {
+        name: 'Modern',
+        value: Platform.OS === 'ios' ? 'Avenir Next' : 'sans-serif',
+        fallback: 'sans-serif'
+    },
 ];
 
 export default function NoteEditor({ onSend, onCancel }: NoteEditorProps) {
@@ -36,7 +58,7 @@ export default function NoteEditor({ onSend, onCancel }: NoteEditorProps) {
     const [text, setText] = useState('');
     const [paths, setPaths] = useState<PathData[]>([]);
     const [selectedColor, setSelectedColor] = useState(PALETTE[0]);
-    const [selectedFont, setSelectedFont] = useState('System');
+    const [selectedFont, setSelectedFont] = useState<string | undefined>(FONTS[0].fallback);
     const [isBold, setIsBold] = useState(false);
     const [isItalic, setIsItalic] = useState(false);
     const [isUnderline, setIsUnderline] = useState(false);
@@ -195,25 +217,40 @@ export default function NoteEditor({ onSend, onCancel }: NoteEditorProps) {
                     <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.stylingScroll}>
                         {/* Font Picker */}
                         <View style={styles.fontPicker}>
-                            {FONTS.map(font => (
-                                <TouchableOpacity
-                                    key={font.value}
-                                    style={[
-                                        styles.fontBtn,
-                                        { backgroundColor: theme.card },
-                                        selectedFont === font.value && { backgroundColor: theme.primary }
-                                    ]}
-                                    onPress={() => setSelectedFont(font.value)}
-                                >
-                                    <Text style={[
-                                        styles.fontBtnText,
-                                        { color: selectedFont === font.value ? '#FFF' : theme.text },
-                                        { fontFamily: font.value }
-                                    ]}>
-                                        {font.name}
-                                    </Text>
-                                </TouchableOpacity>
-                            ))}
+                            {FONTS.map(font => {
+                                const isSelected = selectedFont === font.fallback || selectedFont === font.value;
+                                return (
+                                    <TouchableOpacity
+                                        key={font.name}
+                                        style={[
+                                            styles.fontBtn,
+                                            {
+                                                backgroundColor: theme.card,
+                                                borderWidth: 2,
+                                                borderColor: isSelected ? theme.primary : 'transparent'
+                                            },
+                                            isSelected && { backgroundColor: theme.primary }
+                                        ]}
+                                        onPress={() => setSelectedFont(font.fallback)}
+                                    >
+                                        <Text style={[
+                                            styles.fontBtnText,
+                                            { color: isSelected ? '#FFF' : theme.text },
+                                            font.fallback && { fontFamily: font.fallback },
+                                            // Make font preview slightly larger for better visibility
+                                            { fontSize: 15 }
+                                        ]}>
+                                            Aa
+                                        </Text>
+                                        <Text style={[
+                                            styles.fontNameText,
+                                            { color: isSelected ? '#FFF' : theme.textSecondary }
+                                        ]}>
+                                            {font.name}
+                                        </Text>
+                                    </TouchableOpacity>
+                                );
+                            })}
                         </View>
 
                         {/* Divider */}
@@ -369,9 +406,11 @@ const styles = StyleSheet.create({
         gap: 8,
     },
     fontBtn: {
-        paddingHorizontal: 16,
-        paddingVertical: 8,
+        paddingHorizontal: 12,
+        paddingVertical: 10,
         borderRadius: 16,
+        alignItems: 'center',
+        minWidth: 60,
         shadowColor: "#000",
         shadowOffset: { width: 0, height: 1 },
         shadowOpacity: 0.05,
@@ -379,7 +418,12 @@ const styles = StyleSheet.create({
         elevation: 1,
     },
     fontBtnText: {
-        fontSize: 14,
+        fontSize: 18,
+        fontWeight: '600',
+        marginBottom: 2,
+    },
+    fontNameText: {
+        fontSize: 10,
         fontWeight: '600',
     },
     divider: {

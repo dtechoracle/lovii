@@ -13,7 +13,9 @@ import { Alert, Dimensions, Image, ScrollView, StyleSheet, Text, TouchableOpacit
 const { width } = Dimensions.get('window');
 const GRID_PADDING = 24;
 const GRID_GAP = 12;
-const IMAGE_SIZE = (width - (GRID_PADDING * 2) - GRID_GAP) / 2;
+const MAX_IMAGES = 9; // Support up to 9 images (3x3 grid)
+const COLUMNS = 3; // Always use 3 columns for better layout
+const IMAGE_SIZE = (width - (GRID_PADDING * 2) - (GRID_GAP * (COLUMNS - 1))) / COLUMNS;
 
 export default function CollageScreen() {
     const router = useRouter();
@@ -21,20 +23,27 @@ export default function CollageScreen() {
     const [images, setImages] = useState<string[]>([]);
 
     const pickImage = async () => {
-        if (images.length >= 4) {
-            Alert.alert("Limit Reached", "You can only select up to 4 images.");
+        if (images.length >= MAX_IMAGES) {
+            Alert.alert("Limit Reached", `You can only select up to ${MAX_IMAGES} images.`);
             return;
         }
 
         const result = await ImagePicker.launchImageLibraryAsync({
             mediaTypes: ImagePicker.MediaTypeOptions.Images,
-            allowsEditing: true,
-            aspect: [1, 1],
+            allowsMultipleSelection: true,
+            selectionLimit: MAX_IMAGES - images.length,
+            allowsEditing: false, // Disable editing to support multiple selection
             quality: 0.8,
         });
 
         if (!result.canceled) {
-            setImages([...images, result.assets[0].uri]);
+            const newImages = result.assets.map(asset => asset.uri);
+            const totalImages = [...images, ...newImages].slice(0, MAX_IMAGES);
+            setImages(totalImages);
+            
+            if (totalImages.length >= MAX_IMAGES) {
+                Alert.alert("Maximum Reached", `You've reached the maximum of ${MAX_IMAGES} images.`);
+            }
         }
     };
 
@@ -96,51 +105,46 @@ export default function CollageScreen() {
             <ScrollView contentContainerStyle={styles.content}>
                 <OutlinedCard style={[styles.card, { backgroundColor: theme.card }]}>
                     <View style={styles.grid}>
-                        <View style={styles.row}>
-                            {[0, 1].map((index) => (
-                                <React.Fragment key={index}>
-                                    {images[index] ? (
-                                        <View style={styles.imageWrapper}>
-                                            <Image source={{ uri: images[index] }} style={styles.image} />
-                                            <TouchableOpacity style={styles.removeBtn} onPress={() => removeImage(index)}>
-                                                <Ionicons name="close-circle" size={24} color="#FFF" />
+                        {Array.from({ length: Math.ceil(MAX_IMAGES / COLUMNS) }).map((_, rowIndex) => (
+                            <View key={rowIndex} style={styles.row}>
+                                {Array.from({ length: COLUMNS }).map((_, colIndex) => {
+                                    const index = rowIndex * COLUMNS + colIndex;
+                                    const hasImage = images[index];
+                                    const canAddMore = images.length < MAX_IMAGES;
+
+                                    if (hasImage) {
+                                        return (
+                                            <View key={index} style={styles.imageWrapper}>
+                                                <Image source={{ uri: images[index] }} style={styles.image} />
+                                                <TouchableOpacity style={styles.removeBtn} onPress={() => removeImage(index)}>
+                                                    <Ionicons name="close-circle" size={24} color="#FFF" />
+                                                </TouchableOpacity>
+                                            </View>
+                                        );
+                                    } else if (index === images.length && canAddMore) {
+                                        // Show "Add" button only for the next available slot
+                                        return (
+                                            <TouchableOpacity 
+                                                key={index} 
+                                                style={[styles.addBtn, { backgroundColor: theme.background }]} 
+                                                onPress={pickImage}
+                                            >
+                                                <Ionicons name="add" size={32} color={theme.primary} />
+                                                <Text style={[styles.addText, { color: theme.primary }]}>Add</Text>
                                             </TouchableOpacity>
-                                        </View>
-                                    ) : (
-                                        <TouchableOpacity style={[styles.addBtn, { backgroundColor: theme.background }]} onPress={pickImage}>
-                                            <Ionicons name="add" size={32} color={theme.primary} />
-                                            <Text style={[styles.addText, { color: theme.primary }]}>Add</Text>
-                                        </TouchableOpacity>
-                                    )}
-                                </React.Fragment>
-                            ))}
-                        </View>
-                        <View style={styles.row}>
-                            {[2, 3].map((index) => (
-                                <React.Fragment key={index}>
-                                    {images[index] ? (
-                                        <View style={styles.imageWrapper}>
-                                            <Image source={{ uri: images[index] }} style={styles.image} />
-                                            <TouchableOpacity style={styles.removeBtn} onPress={() => removeImage(index)}>
-                                                <Ionicons name="close-circle" size={24} color="#FFF" />
-                                            </TouchableOpacity>
-                                        </View>
-                                    ) : images.length < 4 ? (
-                                        <TouchableOpacity style={[styles.addBtn, { backgroundColor: theme.background }]} onPress={pickImage}>
-                                            <Ionicons name="add" size={32} color={theme.primary} />
-                                            <Text style={[styles.addText, { color: theme.primary }]}>Add</Text>
-                                        </TouchableOpacity>
-                                    ) : (
-                                        <View style={styles.emptySlot} />
-                                    )}
-                                </React.Fragment>
-                            ))}
-                        </View>
+                                        );
+                                    } else {
+                                        // Empty slot (hidden)
+                                        return <View key={index} style={styles.emptySlot} />;
+                                    }
+                                })}
+                            </View>
+                        ))}
                     </View>
                 </OutlinedCard>
 
                 <Text style={[styles.hint, { color: theme.textSecondary }]}>
-                    Select up to 4 photos • They'll display in a 2x2 grid
+                    Select up to {MAX_IMAGES} photos • Tap + to add multiple images at once
                 </Text>
             </ScrollView>
         </View>
