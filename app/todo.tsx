@@ -24,7 +24,13 @@ export default function TodoScreen() {
 
     const handleAddTask = async () => {
         if (!newTask.trim()) return;
-        const t: Task = { id: Date.now().toString(), text: newTask, completed: false };
+        const t: Task = {
+            id: Date.now().toString(),
+            text: newTask,
+            completed: false,
+            assignedTo: 'both',
+            category: 'other',
+        };
         const updated = [t, ...tasks];
         setTasks(updated);
         await StorageService.saveTasks(updated);
@@ -43,23 +49,52 @@ export default function TodoScreen() {
         await StorageService.saveTasks(updated);
     };
 
-    const renderItem = ({ item }: { item: Task }) => (
-        <TouchableOpacity activeOpacity={0.8} onPress={() => toggleTask(item.id)}>
-            <OutlinedCard style={[styles.item, item.completed && styles.itemDone]}>
-                <TouchableOpacity style={styles.checkBtn} onPress={() => toggleTask(item.id)}>
-                    <Ionicons
-                        name={item.completed ? "checkmark-circle" : "ellipse-outline"}
-                        size={24}
-                        color={item.completed ? "#4B6EFF" : "#8E8E93"}
-                    />
-                </TouchableOpacity>
-                <Text style={[styles.itemText, item.completed && styles.itemTextDone]}>{item.text}</Text>
-                <TouchableOpacity style={styles.deleteBtn} onPress={() => deleteTask(item.id)}>
-                    <Ionicons name="trash-outline" size={20} color="#FF3B30" />
-                </TouchableOpacity>
-            </OutlinedCard>
-        </TouchableOpacity>
-    );
+    const renderItem = ({ item }: { item: Task }) => {
+        const isOverdue = item.dueDate && item.dueDate < Date.now() && !item.completed;
+        const assignmentColor = item.assignedTo === 'me' ? theme.primary : item.assignedTo === 'partner' ? theme.tint : theme.textSecondary;
+
+        return (
+            <TouchableOpacity activeOpacity={0.8} onPress={() => toggleTask(item.id)}>
+                <OutlinedCard style={[styles.item, { backgroundColor: theme.card }, item.completed && styles.itemDone]}>
+                    <View style={styles.itemLeft}>
+                        <TouchableOpacity style={styles.checkBtn} onPress={() => toggleTask(item.id)}>
+                            <Ionicons
+                                name={item.completed ? "checkmark-circle" : "ellipse-outline"}
+                                size={24}
+                                color={item.completed ? theme.success : theme.textSecondary}
+                            />
+                        </TouchableOpacity>
+                        <View style={styles.itemContent}>
+                            <Text style={[styles.itemText, { color: theme.text }, item.completed && styles.itemTextDone]}>
+                                {item.text}
+                            </Text>
+                            <View style={styles.itemMeta}>
+                                {item.assignedTo && (
+                                    <View style={[styles.assignmentBadge, { backgroundColor: assignmentColor + '15' }]}>
+                                        <Ionicons name="person" size={10} color={assignmentColor} />
+                                        <Text style={[styles.badgeText, { color: assignmentColor }]}>
+                                            {item.assignedTo === 'me' ? 'You' : item.assignedTo === 'partner' ? 'Partner' : 'Both'}
+                                        </Text>
+                                    </View>
+                                )}
+                                {item.dueDate && (
+                                    <View style={[styles.dueBadge, isOverdue && { backgroundColor: theme.error + '15' }]}>
+                                        <Ionicons name="calendar-outline" size={10} color={isOverdue ? theme.error : theme.textSecondary} />
+                                        <Text style={[styles.badgeText, { color: isOverdue ? theme.error : theme.textSecondary }]}>
+                                            {new Date(item.dueDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                                        </Text>
+                                    </View>
+                                )}
+                            </View>
+                        </View>
+                    </View>
+                    <TouchableOpacity style={styles.deleteBtn} onPress={() => deleteTask(item.id)}>
+                        <Ionicons name="trash-outline" size={20} color={theme.error} />
+                    </TouchableOpacity>
+                </OutlinedCard>
+            </TouchableOpacity>
+        );
+    };
 
     return (
         <KeyboardAvoidingView
@@ -116,26 +151,56 @@ const styles = StyleSheet.create({
     item: {
         flexDirection: 'row',
         alignItems: 'center',
+        justifyContent: 'space-between',
         padding: 16,
         borderRadius: 24,
-        backgroundColor: '#FFFFFF',
     },
     itemDone: {
-        opacity: 0.6,
-        backgroundColor: '#F9F9F9',
+        opacity: 0.5,
+    },
+    itemLeft: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        flex: 1,
     },
     checkBtn: {
         marginRight: 12,
     },
-    itemText: {
+    itemContent: {
         flex: 1,
-        color: '#1C1C1E',
+        gap: 6,
+    },
+    itemText: {
         fontSize: 16,
         fontWeight: '600',
     },
     itemTextDone: {
         textDecorationLine: 'line-through',
-        color: '#8E8E93',
+    },
+    itemMeta: {
+        flexDirection: 'row',
+        gap: 8,
+    },
+    assignmentBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 8,
+        gap: 4,
+    },
+    dueBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 8,
+        gap: 4,
+    },
+    badgeText: {
+        fontSize: 10,
+        fontWeight: '600',
+        textTransform: 'uppercase',
     },
     deleteBtn: {
         padding: 8,

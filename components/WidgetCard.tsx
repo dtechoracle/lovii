@@ -25,8 +25,9 @@ export default function WidgetCard({ note, onPress, partnerName = 'Partner', myU
         if (!note) {
             return (
                 <View style={styles.emptyState}>
-                    <Ionicons name="heart" size={64} color="#FFD1DC" />
-                    <Text style={styles.emptyText}>Tap to send love</Text>
+                    <Ionicons name="heart" size={64} color={theme.primary + '40'} />
+                    <Text style={[styles.emptyText, { color: theme.textSecondary }]}>Tap to create your first note</Text>
+                    <Text style={[styles.emptySubtext, { color: theme.textSecondary }]}>Share moments together</Text>
                 </View>
             );
         }
@@ -150,7 +151,7 @@ const styles = StyleSheet.create({
     card: {
         height: CARD_HEIGHT,
         padding: 24,
-        borderRadius: 40, // Extra soft
+        borderRadius: 40,
     },
     cardHeader: {
         flexDirection: 'row',
@@ -158,10 +159,28 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         marginBottom: 16,
     },
-    cardTitle: {
-        fontSize: 20,
+    headerLeft: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
+        flex: 1,
+    },
+    senderBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 10,
+        paddingVertical: 6,
+        borderRadius: 12,
+        gap: 6,
+    },
+    senderText: {
+        fontSize: 12,
         fontWeight: '700',
-        color: '#1C1C1E',
+        textTransform: 'uppercase',
+    },
+    cardTitle: {
+        fontSize: 16,
+        fontWeight: '600',
     },
     emptyState: {
         flex: 1,
@@ -170,9 +189,12 @@ const styles = StyleSheet.create({
         gap: 16,
     },
     emptyText: {
-        color: '#8E8E93',
         fontSize: 18,
-        fontWeight: '600',
+        fontWeight: '700',
+    },
+    emptySubtext: {
+        fontSize: 14,
+        fontWeight: '500',
     },
     textContent: {
         flex: 1,

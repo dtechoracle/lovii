@@ -226,6 +226,8 @@ export default function HomeScreen() {
             <WidgetCard
               note={latestNote}
               onPress={() => router.push('/editor')}
+              partnerName={profile?.partnerName || 'Partner'}
+              myUserId={profile?.id}
             />
 
             {/* Pinned Notes */}
