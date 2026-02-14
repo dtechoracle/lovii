@@ -3,13 +3,17 @@ import OutlinedCard from '@/components/ui/OutlinedCard';
 import { useTheme } from '@/context/ThemeContext';
 import { Note, StorageService } from '@/services/storage';
 import { Ionicons } from '@expo/vector-icons';
+import * as FileSystem from 'expo-file-system';
+import * as ImageManipulator from 'expo-image-manipulator';
 import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import { Alert, Dimensions, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 const { width } = Dimensions.get('window');
-const IMAGE_SIZE = (width - 48) / 2 - 24;
+const GRID_PADDING = 24;
+const GRID_GAP = 12;
+const IMAGE_SIZE = (width - (GRID_PADDING * 2) - GRID_GAP) / 2;
 
 export default function CollageScreen() {
     const router = useRouter();
@@ -90,28 +94,53 @@ export default function CollageScreen() {
             />
 
             <ScrollView contentContainerStyle={styles.content}>
-                <OutlinedCard style={styles.card}>
+                <OutlinedCard style={[styles.card, { backgroundColor: theme.card }]}>
                     <View style={styles.grid}>
-                        {images.map((uri, index) => (
-                            <View key={index} style={styles.imageWrapper}>
-                                <Image source={{ uri }} style={styles.image} />
-                                <TouchableOpacity style={styles.removeBtn} onPress={() => removeImage(index)}>
-                                    <Ionicons name="close-circle" size={24} color="#FFF" />
-                                </TouchableOpacity>
-                            </View>
-                        ))}
-
-                        {images.length < 4 && (
-                            <TouchableOpacity style={styles.addBtn} onPress={pickImage}>
-                                <Ionicons name="add" size={32} color="#4B6EFF" />
-                                <Text style={styles.addText}>Add Photo</Text>
-                            </TouchableOpacity>
-                        )}
+                        <View style={styles.row}>
+                            {[0, 1].map((index) => (
+                                <React.Fragment key={index}>
+                                    {images[index] ? (
+                                        <View style={styles.imageWrapper}>
+                                            <Image source={{ uri: images[index] }} style={styles.image} />
+                                            <TouchableOpacity style={styles.removeBtn} onPress={() => removeImage(index)}>
+                                                <Ionicons name="close-circle" size={24} color="#FFF" />
+                                            </TouchableOpacity>
+                                        </View>
+                                    ) : (
+                                        <TouchableOpacity style={[styles.addBtn, { backgroundColor: theme.background }]} onPress={pickImage}>
+                                            <Ionicons name="add" size={32} color={theme.primary} />
+                                            <Text style={[styles.addText, { color: theme.primary }]}>Add</Text>
+                                        </TouchableOpacity>
+                                    )}
+                                </React.Fragment>
+                            ))}
+                        </View>
+                        <View style={styles.row}>
+                            {[2, 3].map((index) => (
+                                <React.Fragment key={index}>
+                                    {images[index] ? (
+                                        <View style={styles.imageWrapper}>
+                                            <Image source={{ uri: images[index] }} style={styles.image} />
+                                            <TouchableOpacity style={styles.removeBtn} onPress={() => removeImage(index)}>
+                                                <Ionicons name="close-circle" size={24} color="#FFF" />
+                                            </TouchableOpacity>
+                                        </View>
+                                    ) : images.length < 4 ? (
+                                        <TouchableOpacity style={[styles.addBtn, { backgroundColor: theme.background }]} onPress={pickImage}>
+                                            <Ionicons name="add" size={32} color={theme.primary} />
+                                            <Text style={[styles.addText, { color: theme.primary }]}>Add</Text>
+                                        </TouchableOpacity>
+                                    ) : (
+                                        <View style={styles.emptySlot} />
+                                    )}
+                                </React.Fragment>
+                            ))}
+                        </View>
                     </View>
                 </OutlinedCard>
 
-                <Text style={styles.hint}>
-                    Select up to 4 photos for your partner's widget.
+                <Text style={[styles.hint, { color: theme.textSecondary }]}>
+                    Select up to 4 photos • They'll display in a 2x2 grid
                 </Text>
             </ScrollView>
         </View>
@@ -143,9 +172,11 @@ const styles = StyleSheet.create({
         borderRadius: 32,
     },
     grid: {
+        gap: GRID_GAP,
+    },
+    row: {
         flexDirection: 'row',
-        flexWrap: 'wrap',
-        gap: 16,
+        gap: GRID_GAP,
         justifyContent: 'center',
     },
     imageWrapper: {
@@ -154,6 +185,10 @@ const styles = StyleSheet.create({
         borderRadius: 20,
         overflow: 'hidden',
         position: 'relative',
+    },
+    emptySlot: {
+        width: IMAGE_SIZE,
+        height: IMAGE_SIZE,
     },
     image: {
         width: '100%',

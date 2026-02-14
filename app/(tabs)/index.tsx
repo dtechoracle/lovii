@@ -58,7 +58,7 @@ export default function HomeScreen() {
   // Search functionality
   const handleSearch = async (query: string) => {
     setSearchQuery(query);
-    
+
     if (!query.trim()) {
       setIsSearching(false);
       setSearchResults([]);
@@ -72,7 +72,7 @@ export default function HomeScreen() {
 
     const results = allNotes.filter(note => {
       const searchLower = query.toLowerCase();
-      
+
       // Search in text content
       if (note.type === 'text' && note.content.toLowerCase().includes(searchLower)) {
         return true;
@@ -228,6 +228,7 @@ export default function HomeScreen() {
               onPress={() => router.push('/editor')}
               partnerName={profile?.partnerName || 'Partner'}
               myUserId={profile?.id}
+              onNoteUpdate={loadData}
             />
 
             {/* Pinned Notes */}

@@ -1,9 +1,10 @@
 import { useTheme } from '@/context/ThemeContext';
-import { Note } from '@/services/storage';
+import { Note, StorageService } from '@/services/storage';
 import { Ionicons } from '@expo/vector-icons';
-import React from 'react';
-import { Dimensions, Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import React, { useState } from 'react';
+import { Alert, Dimensions, Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import DrawingViewer from './DrawingViewer';
+import NoteOptions from './NoteOptions';
 import OutlinedCard from './ui/OutlinedCard';
 
 interface WidgetCardProps {
@@ -11,15 +12,46 @@ interface WidgetCardProps {
     onPress: () => void;
     partnerName?: string;
     myUserId?: string;
+    onNoteUpdate?: () => void;
 }
 
 const { width, height } = Dimensions.get('window');
 const CARD_HEIGHT = height * 0.5;
 const CARD_WIDTH = width - 48;
 
-export default function WidgetCard({ note, onPress, partnerName = 'Partner', myUserId }: WidgetCardProps) {
+export default function WidgetCard({ note, onPress, partnerName = 'Partner', myUserId, onNoteUpdate }: WidgetCardProps) {
     const { theme } = useTheme();
     const isMyNote = note?.userId === myUserId;
+    const [optionsVisible, setOptionsVisible] = useState(false);
+
+    const handleAction = async (action: 'pin' | 'bookmark' | 'widget' | 'delete', selectedNote: Note) => {
+        if (action === 'delete') {
+            Alert.alert(
+                "Delete Note",
+                "Are you sure you want to delete this note?",
+                [
+                    { text: "Cancel", style: "cancel" },
+                    {
+                        text: "Delete",
+                        style: "destructive",
+                        onPress: async () => {
+                            await StorageService.deleteNote(selectedNote.id);
+                            onNoteUpdate?.();
+                        }
+                    }
+                ]
+            );
+        } else if (action === 'pin') {
+            await StorageService.togglePin(selectedNote.id, selectedNote.pinned || false);
+            onNoteUpdate?.();
+        } else if (action === 'bookmark') {
+            await StorageService.toggleBookmark(selectedNote.id, selectedNote.bookmarked || false);
+            onNoteUpdate?.();
+        } else if (action === 'widget') {
+            await StorageService.sendToPartnerWidget(selectedNote);
+            Alert.alert("Sent!", "This note will appear on your partner's widget soon!");
+        }
+    };
 
     const renderContent = () => {
         if (!note) {
@@ -104,46 +136,61 @@ export default function WidgetCard({ note, onPress, partnerName = 'Partner', myU
     };
 
     return (
-        <TouchableOpacity activeOpacity={0.9} onPress={onPress}>
-            <OutlinedCard style={[styles.card, { backgroundColor: theme.card }]}>
-                <View style={styles.cardHeader}>
-                    <View style={styles.headerLeft}>
-                        {note && (
-                            <View style={[
-                                styles.senderBadge,
-                                { backgroundColor: isMyNote ? theme.primary + '15' : theme.tint + '15' }
-                            ]}>
-                                <Ionicons
-                                    name={isMyNote ? 'person' : 'heart'}
-                                    size={14}
-                                    color={isMyNote ? theme.primary : theme.tint}
-                                />
-                                <Text style={[styles.senderText, { color: isMyNote ? theme.primary : theme.tint }]}>
-                                    {isMyNote ? 'You' : partnerName}
-                                </Text>
-                            </View>
-                        )}
-                        <Text style={[styles.cardTitle, { color: theme.text }]}>
-                            {note ? 'Latest Note' : 'No Notes Yet'}
-                        </Text>
-                    </View>
-                    <Ionicons name="ellipsis-horizontal" size={24} color={theme.textSecondary} />
-                </View>
-
-                {renderContent()}
-
-                {note && (
-                    <View style={styles.footer}>
-                        <View style={[styles.badge, { backgroundColor: theme.background }]}>
-                            <Ionicons name="time" size={14} color={theme.textSecondary} style={{ marginRight: 4 }} />
-                            <Text style={[styles.badgeText, { color: theme.textSecondary }]}>
-                                {new Date(note.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+        <>
+            <TouchableOpacity activeOpacity={0.9} onPress={onPress}>
+                <OutlinedCard style={[styles.card, { backgroundColor: theme.card }]}>
+                    <View style={styles.cardHeader}>
+                        <View style={styles.headerLeft}>
+                            {note && (
+                                <View style={[
+                                    styles.senderBadge,
+                                    { backgroundColor: isMyNote ? theme.primary + '15' : theme.tint + '15' }
+                                ]}>
+                                    <Ionicons
+                                        name={isMyNote ? 'person' : 'heart'}
+                                        size={14}
+                                        color={isMyNote ? theme.primary : theme.tint}
+                                    />
+                                    <Text style={[styles.senderText, { color: isMyNote ? theme.primary : theme.tint }]}>
+                                        {isMyNote ? 'You' : partnerName}
+                                    </Text>
+                                </View>
+                            )}
+                            <Text style={[styles.cardTitle, { color: theme.text }]}>
+                                {note ? 'Latest Note' : 'No Notes Yet'}
                             </Text>
                         </View>
+                        {note && (
+                            <TouchableOpacity onPress={() => setOptionsVisible(true)} style={styles.menuButton}>
+                                <Ionicons name="ellipsis-horizontal" size={24} color={theme.textSecondary} />
+                            </TouchableOpacity>
+                        )}
                     </View>
-                )}
-            </OutlinedCard>
-        </TouchableOpacity>
+
+                    {renderContent()}
+
+                    {note && (
+                        <View style={styles.footer}>
+                            <View style={[styles.badge, { backgroundColor: theme.background }]}>
+                                <Ionicons name="time" size={14} color={theme.textSecondary} style={{ marginRight: 4 }} />
+                                <Text style={[styles.badgeText, { color: theme.textSecondary }]}>
+                                    {new Date(note.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                </Text>
+                            </View>
+                        </View>
+                    )}
+                </OutlinedCard>
+            </TouchableOpacity>
+
+            {note && (
+                <NoteOptions
+                    visible={optionsVisible}
+                    onClose={() => setOptionsVisible(false)}
+                    note={note}
+                    onAction={handleAction}
+                />
+            )}
+        </>
     );
 }
 
@@ -250,5 +297,8 @@ const styles = StyleSheet.create({
         color: '#8E8E93',
         fontSize: 12,
         fontWeight: '600',
+    },
+    menuButton: {
+        padding: 4,
     },
 });

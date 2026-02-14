@@ -1,9 +1,9 @@
 import { useTheme } from '@/context/ThemeContext';
 import { Ionicons } from '@expo/vector-icons';
 import React, { useRef, useState } from 'react';
-import { ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import ViewShot from 'react-native-view-shot';
-import Canvas from './Canvas';
+import Canvas, { PathData } from './Canvas';
 import ScreenHeader from './ScreenHeader';
 import OutlinedCard from './ui/OutlinedCard';
 
@@ -23,13 +23,35 @@ const PALETTE = [
     '#AF52DE', // Pink
 ];
 
+const FONTS = [
+    { name: 'Default', value: 'System' },
+    { name: 'Serif', value: 'serif' },
+    { name: 'Monospace', value: 'monospace' },
+    { name: 'Cursive', value: 'Courier' },
+];
+
 export default function NoteEditor({ onSend, onCancel }: NoteEditorProps) {
     const { theme } = useTheme();
     const [mode, setMode] = useState<'text' | 'drawing'>('drawing');
     const [text, setText] = useState('');
-    const [paths, setPaths] = useState<string[]>([]);
+    const [paths, setPaths] = useState<PathData[]>([]);
     const [selectedColor, setSelectedColor] = useState(PALETTE[0]);
+    const [selectedFont, setSelectedFont] = useState('System');
+    const [isBold, setIsBold] = useState(false);
+    const [isItalic, setIsItalic] = useState(false);
+    const [isUnderline, setIsUnderline] = useState(false);
     const viewShotRef = useRef<ViewShot>(null);
+
+    const handleUndo = () => {
+        if (paths.length > 0) {
+            const newPaths = paths.slice(0, -1);
+            setPaths(newPaths);
+        }
+    };
+
+    const handleClear = () => {
+        setPaths([]);
+    };
 
     const handleSend = async () => {
         if (mode === 'text') {
@@ -73,7 +95,6 @@ export default function NoteEditor({ onSend, onCancel }: NoteEditorProps) {
         }
     };
 
-    // We need to capture base64 for the widget.
     const handleDrawingSend = async () => {
         try {
             let imageBase64 = null;
@@ -81,30 +102,9 @@ export default function NoteEditor({ onSend, onCancel }: NoteEditorProps) {
                 imageBase64 = await (viewShotRef.current as any).capture();
             }
 
-            // We pack the base64 image into the content string alongside paths? 
-            // Or we use a delimiter? 
-            // JSON.stringify({ paths, preview: imageBase64 }) -> This breaks existing viewers.
-
-            // Better: Update `onSend` signature in `editor.tsx` to accept extra data.
-            // For now, let's just stick to paths and fix the widget to render "Drawing" text properly
-            // OR simply accept that we need to change code structure.
-
-            // Wait, the user wants the ACTUAL drawing on the widget.
-            // So we MUST have the image.
-
-            // Let's modify onSend to pass the base64 image as the content for now?
-            // No, then we lose editable paths.
-
-            // Let's modify the onSend signature in a separate step?
-            // No, let's do it right here.
-
-            // Actually, let's just pass a JSON object as content:
-            // { paths: [...], preview: "data:image..." }
-            // And update DrawingViewer to handle that.
-
             const contentObj = {
                 paths,
-                preview: imageBase64 // capture with result="data-uri"
+                preview: imageBase64
             };
 
             onSend(JSON.stringify(contentObj), 'drawing', selectedColor);
@@ -116,47 +116,62 @@ export default function NoteEditor({ onSend, onCancel }: NoteEditorProps) {
     }
 
     return (
-        <View style={[styles.container, { backgroundColor: theme.background }]}>
+        <KeyboardAvoidingView
+            style={[styles.container, { backgroundColor: theme.background }]}
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            keyboardVerticalOffset={80}
+        >
             <ScreenHeader
                 showBack
                 onBack={onCancel}
                 title={
-                    <View style={styles.modeSwitch}>
+                    <View style={[styles.modeSwitch, { backgroundColor: theme.card }]}>
                         <TouchableOpacity
-                            style={[styles.modeBtn, mode === 'drawing' && styles.activeMode]}
+                            style={[styles.modeBtn, mode === 'drawing' && [styles.activeMode, { backgroundColor: theme.primary, shadowColor: theme.primary }]]}
                             onPress={() => setMode('drawing')}
                         >
-                            <Ionicons name="pencil" size={20} color={mode === 'drawing' ? '#FFF' : '#8E8E93'} />
+                            <Ionicons name="pencil" size={20} color={mode === 'drawing' ? '#FFF' : theme.textSecondary} />
                         </TouchableOpacity>
                         <TouchableOpacity
-                            style={[styles.modeBtn, mode === 'text' && styles.activeMode]}
+                            style={[styles.modeBtn, mode === 'text' && [styles.activeMode, { backgroundColor: theme.primary, shadowColor: theme.primary }]]}
                             onPress={() => setMode('text')}
                         >
-                            <Ionicons name="text" size={20} color={mode === 'text' ? '#FFF' : '#8E8E93'} />
+                            <Ionicons name="text" size={20} color={mode === 'text' ? '#FFF' : theme.textSecondary} />
                         </TouchableOpacity>
                     </View>
                 }
                 rightAction={
-                    <TouchableOpacity onPress={mode === 'drawing' ? handleDrawingSend : handleSend} style={styles.sendBtn}>
+                    <TouchableOpacity onPress={mode === 'drawing' ? handleDrawingSend : handleSend} style={[styles.sendBtn, { backgroundColor: theme.primary }]}>
                         <Text style={styles.sendText}>Send</Text>
                     </TouchableOpacity>
                 }
             />
 
             <View style={styles.editorArea}>
-                <OutlinedCard style={{ flex: 1, padding: 0, overflow: 'hidden', borderRadius: 32 }}>
+                <OutlinedCard style={{ flex: 1, padding: 0, overflow: 'hidden', borderRadius: 32, backgroundColor: theme.card }}>
                     {mode === 'text' ? (
-                        <TextInput
-                            style={[styles.textInput, { color: selectedColor, backgroundColor: '#FFFFFF' }]}
-                            multiline
-                            placeholder="Write something..."
-                            placeholderTextColor="#C7C7CC"
-                            value={text}
-                            onChangeText={setText}
-                            autoFocus
-                            autoCapitalize="sentences"
-                            autoCorrect={true}
-                        />
+                        <ScrollView style={{ flex: 1 }} contentContainerStyle={{ flexGrow: 1 }}>
+                            <TextInput
+                                style={[
+                                    styles.textInput,
+                                    {
+                                        color: selectedColor,
+                                        fontFamily: selectedFont,
+                                        fontWeight: isBold ? 'bold' : 'normal',
+                                        fontStyle: isItalic ? 'italic' : 'normal',
+                                        textDecorationLine: isUnderline ? 'underline' : 'none',
+                                    }
+                                ]}
+                                multiline
+                                placeholder="Write something..."
+                                placeholderTextColor="#C7C7CC"
+                                value={text}
+                                onChangeText={setText}
+                                autoFocus
+                                autoCapitalize="sentences"
+                                autoCorrect={true}
+                            />
+                        </ScrollView>
                     ) : (
                         <ViewShot
                             ref={viewShotRef}
@@ -166,15 +181,119 @@ export default function NoteEditor({ onSend, onCancel }: NoteEditorProps) {
                             <Canvas
                                 color={selectedColor}
                                 strokeWidth={6}
+                                paths={paths}
                                 onPathsChange={setPaths}
-                                style={{ backgroundColor: 'transparent', flex: 1 }}
                             />
                         </ViewShot>
                     )}
                 </OutlinedCard>
             </View>
 
-            <View style={styles.colorPicker}>
+            {/* Text Styling Options */}
+            {mode === 'text' && (
+                <View style={[styles.stylingBar, { backgroundColor: theme.background, borderTopColor: theme.border }]}>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.stylingScroll}>
+                        {/* Font Picker */}
+                        <View style={styles.fontPicker}>
+                            {FONTS.map(font => (
+                                <TouchableOpacity
+                                    key={font.value}
+                                    style={[
+                                        styles.fontBtn,
+                                        { backgroundColor: theme.card },
+                                        selectedFont === font.value && { backgroundColor: theme.primary }
+                                    ]}
+                                    onPress={() => setSelectedFont(font.value)}
+                                >
+                                    <Text style={[
+                                        styles.fontBtnText,
+                                        { color: selectedFont === font.value ? '#FFF' : theme.text },
+                                        { fontFamily: font.value }
+                                    ]}>
+                                        {font.name}
+                                    </Text>
+                                </TouchableOpacity>
+                            ))}
+                        </View>
+
+                        {/* Divider */}
+                        <View style={[styles.divider, { backgroundColor: theme.border }]} />
+
+                        {/* Text Style Buttons */}
+                        <View style={styles.styleButtons}>
+                            <TouchableOpacity
+                                style={[
+                                    styles.styleBtn,
+                                    { backgroundColor: theme.card },
+                                    isBold && { backgroundColor: theme.primary }
+                                ]}
+                                onPress={() => setIsBold(!isBold)}
+                            >
+                                <Text style={[styles.styleBtnText, { color: isBold ? '#FFF' : theme.text, fontWeight: 'bold' }]}>B</Text>
+                            </TouchableOpacity>
+
+                            <TouchableOpacity
+                                style={[
+                                    styles.styleBtn,
+                                    { backgroundColor: theme.card },
+                                    isItalic && { backgroundColor: theme.primary }
+                                ]}
+                                onPress={() => setIsItalic(!isItalic)}
+                            >
+                                <Text style={[styles.styleBtnText, { color: isItalic ? '#FFF' : theme.text, fontStyle: 'italic' }]}>I</Text>
+                            </TouchableOpacity>
+
+                            <TouchableOpacity
+                                style={[
+                                    styles.styleBtn,
+                                    { backgroundColor: theme.card },
+                                    isUnderline && { backgroundColor: theme.primary }
+                                ]}
+                                onPress={() => setIsUnderline(!isUnderline)}
+                            >
+                                <Text style={[styles.styleBtnText, { color: isUnderline ? '#FFF' : theme.text, textDecorationLine: 'underline' }]}>U</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </ScrollView>
+                </View>
+            )}
+
+            {/* Drawing Tools */}
+            {mode === 'drawing' && (
+                <View style={[styles.stylingBar, { backgroundColor: theme.background, borderTopColor: theme.border }]}>
+                    <View style={styles.drawingTools}>
+                        <TouchableOpacity
+                            style={[styles.toolBtn, { backgroundColor: theme.card }]}
+                            onPress={handleUndo}
+                            disabled={paths.length === 0}
+                        >
+                            <Ionicons name="arrow-undo" size={20} color={paths.length === 0 ? theme.textSecondary : theme.text} />
+                            <Text style={[styles.toolBtnText, { color: paths.length === 0 ? theme.textSecondary : theme.text }]}>Undo</Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                            style={[styles.toolBtn, { backgroundColor: theme.card }]}
+                            onPress={handleClear}
+                            disabled={paths.length === 0}
+                        >
+                            <Ionicons name="trash-outline" size={20} color={paths.length === 0 ? theme.textSecondary : theme.error} />
+                            <Text style={[styles.toolBtnText, { color: paths.length === 0 ? theme.textSecondary : theme.error }]}>Clear</Text>
+                        </TouchableOpacity>
+
+                        <View style={{ flex: 1 }} />
+
+                        <View style={[styles.pathCounter, { backgroundColor: theme.card }]}>
+                            <Ionicons name="brush" size={16} color={theme.textSecondary} />
+                            <Text style={[styles.counterText, { color: theme.textSecondary }]}>{paths.length} stroke{paths.length !== 1 ? 's' : ''}</Text>
+                        </View>
+                    </View>
+                </View>
+            )}
+
+            <View style={[styles.colorPicker, { backgroundColor: theme.background }]}>
+                <Text style={[styles.colorLabel, { color: theme.textSecondary }]}>
+                    {mode === 'drawing' ? 'Brush Color' : 'Text Color'}
+                </Text>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                     {PALETTE.map(color => (
                         <TouchableOpacity
@@ -182,14 +301,14 @@ export default function NoteEditor({ onSend, onCancel }: NoteEditorProps) {
                             style={[
                                 styles.colorSwatch,
                                 { backgroundColor: color },
-                                selectedColor === color && styles.selectedSwatch
+                                selectedColor === color && [styles.selectedSwatch, { borderColor: theme.primary }]
                             ]}
                             onPress={() => setSelectedColor(color)}
                         />
                     ))}
                 </ScrollView>
             </View>
-        </View>
+        </KeyboardAvoidingView>
     );
 }
 
@@ -199,7 +318,6 @@ const styles = StyleSheet.create({
         paddingTop: 60,
     },
     sendBtn: {
-        backgroundColor: '#4B6EFF', // Soft Blue
         paddingHorizontal: 16,
         paddingVertical: 8,
         borderRadius: 16,
@@ -211,7 +329,6 @@ const styles = StyleSheet.create({
     },
     modeSwitch: {
         flexDirection: 'row',
-        backgroundColor: '#FFFFFF',
         borderRadius: 20,
         padding: 4,
     },
@@ -222,9 +339,6 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     activeMode: {
-        backgroundColor: '#4B6EFF',
-        // Shadow for active state
-        shadowColor: "#4B6EFF",
         shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.3,
         shadowRadius: 8,
@@ -235,15 +349,74 @@ const styles = StyleSheet.create({
         margin: 16,
     },
     textInput: {
-        flex: 1,
+        minHeight: 400,
         padding: 24,
         fontSize: 24,
-        fontWeight: '600',
         textAlignVertical: 'top',
+    },
+    stylingBar: {
+        paddingHorizontal: 16,
+        paddingVertical: 12,
+        borderTopWidth: 1,
+    },
+    stylingScroll: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
+    },
+    fontPicker: {
+        flexDirection: 'row',
+        gap: 8,
+    },
+    fontBtn: {
+        paddingHorizontal: 16,
+        paddingVertical: 8,
+        borderRadius: 16,
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.05,
+        shadowRadius: 2,
+        elevation: 1,
+    },
+    fontBtnText: {
+        fontSize: 14,
+        fontWeight: '600',
+    },
+    divider: {
+        width: 1,
+        height: 32,
+        marginHorizontal: 8,
+    },
+    styleButtons: {
+        flexDirection: 'row',
+        gap: 8,
+    },
+    styleBtn: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        alignItems: 'center',
+        justifyContent: 'center',
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.05,
+        shadowRadius: 2,
+        elevation: 1,
+    },
+    styleBtnText: {
+        fontSize: 18,
+        fontWeight: '600',
     },
     colorPicker: {
         padding: 16,
         paddingBottom: 40,
+    },
+    colorLabel: {
+        fontSize: 12,
+        fontWeight: '600',
+        marginBottom: 12,
+        textTransform: 'uppercase',
+        letterSpacing: 0.5,
     },
     colorSwatch: {
         width: 44,
@@ -251,7 +424,7 @@ const styles = StyleSheet.create({
         borderRadius: 22,
         marginRight: 12,
         borderWidth: 2,
-        borderColor: '#FFF', // White border to pop against BG
+        borderColor: '#FFF',
         shadowColor: "#000",
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.1,
@@ -260,6 +433,40 @@ const styles = StyleSheet.create({
     },
     selectedSwatch: {
         transform: [{ scale: 1.2 }],
-        borderColor: '#4B6EFF',
+        borderWidth: 3,
+    },
+    drawingTools: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
+    },
+    toolBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        paddingHorizontal: 16,
+        paddingVertical: 10,
+        borderRadius: 16,
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.05,
+        shadowRadius: 2,
+        elevation: 1,
+    },
+    toolBtnText: {
+        fontSize: 14,
+        fontWeight: '600',
+    },
+    pathCounter: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+        borderRadius: 16,
+    },
+    counterText: {
+        fontSize: 12,
+        fontWeight: '600',
     },
 });

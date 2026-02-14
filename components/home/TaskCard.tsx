@@ -2,8 +2,8 @@ import { useTheme } from '@/context/ThemeContext';
 import { StorageService, Task } from '@/services/storage';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import React, { useEffect, useState } from 'react';
-import { StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import OutlinedCard from '../ui/OutlinedCard';
 
 export default function TaskCard() {
@@ -11,6 +11,7 @@ export default function TaskCard() {
     const router = useRouter();
     const [tasks, setTasks] = useState<Task[]>([]);
     const [newTask, setNewTask] = useState('');
+    const scrollViewRef = useRef<ScrollView>(null);
 
     useEffect(() => {
         loadTasks();
@@ -48,7 +49,12 @@ export default function TaskCard() {
                     <Text style={[styles.title, { color: theme.text }]}>Tasks</Text>
                 </View>
 
-                <View style={styles.list}>
+                <ScrollView
+                    style={styles.list}
+                    ref={scrollViewRef}
+                    nestedScrollEnabled={true}
+                    showsVerticalScrollIndicator={false}
+                >
                     {tasks.slice(0, 3).map(t => (
                         <TouchableOpacity key={t.id} style={styles.item} onPress={() => toggleTask(t.id)}>
                             <Ionicons
@@ -68,7 +74,7 @@ export default function TaskCard() {
                             <Text style={[styles.emptySubtext, { color: theme.textSecondary }]}>Add a task below</Text>
                         </View>
                     )}
-                </View>
+                </ScrollView>
 
                 <View style={[styles.inputContainer, { backgroundColor: theme.background }]}>
                     <TextInput

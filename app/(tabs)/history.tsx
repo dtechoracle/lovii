@@ -12,6 +12,7 @@ import {
     Alert,
     Image,
     RefreshControl,
+    SafeAreaView,
     SectionList,
     StyleSheet,
     TouchableOpacity,
@@ -196,7 +197,7 @@ export default function HistoryScreen() {
 
     const renderItem = ({ item }: { item: Note }) => {
         const isMyNote = item.userId === myUserId;
-        
+
         return (
             <TouchableOpacity
                 activeOpacity={0.8}
@@ -279,7 +280,7 @@ export default function HistoryScreen() {
     };
 
     return (
-        <View style={[styles.container, { backgroundColor: theme.background, paddingTop: 40 }]}>
+        <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
             <ScreenHeader title="Timeline" showBack />
             <SectionList
                 sections={groupedHistory}
@@ -320,14 +321,14 @@ export default function HistoryScreen() {
                 options={alertConfig.options}
                 onClose={() => setAlertConfig({ ...alertConfig, visible: false })}
             />
-        </View>
+        </SafeAreaView>
     );
 }
 
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        paddingBottom: 80, // Space for phone's bottom navbar
+        paddingBottom: 80,
     },
     list: {
         padding: 24,

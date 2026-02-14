@@ -1,5 +1,5 @@
-import { useTheme } from '@/context/ThemeContext';
 import { ThemeMode, ThemePreference } from '@/constants/types';
+import { useTheme } from '@/context/ThemeContext';
 import { Ionicons } from '@expo/vector-icons';
 import React, { useState } from 'react';
 import { Dimensions, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
@@ -29,10 +29,19 @@ export default function ThemePickerModal({ visible, onClose }: ThemePickerModalP
     const [selectedTheme, setSelectedTheme] = useState<ThemePreference>(themePreference);
     const [selectedMode, setSelectedMode] = useState<ThemeMode>(themeMode);
 
+    // Sync state when modal opens
+    React.useEffect(() => {
+        if (visible) {
+            setSelectedTheme(themePreference);
+            setSelectedMode(themeMode);
+        }
+    }, [visible, themePreference, themeMode]);
+
     const handleSave = async () => {
         await setThemePreference(selectedTheme);
         await setThemeMode(selectedMode);
-        onClose();
+        // Small delay to ensure state updates
+        setTimeout(() => onClose(), 100);
     };
 
     return (
