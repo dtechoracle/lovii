@@ -1,13 +1,15 @@
 import CustomAlert from '@/components/CustomAlert';
 import ScreenHeader from '@/components/ScreenHeader';
 import { ThemedText } from '@/components/themed-text';
+import ThemePickerModal from '@/components/ThemePickerModal';
 import OutlinedCard from '@/components/ui/OutlinedCard';
 import { useTheme } from '@/context/ThemeContext';
 import { StorageService, UserProfile } from '@/services/storage';
 import { Ionicons } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { Alert, ScrollView, Share, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Alert, Image, ScrollView, Share, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
 export default function ConnectScreen() {
     const router = useRouter();
@@ -15,9 +17,9 @@ export default function ConnectScreen() {
     const [code, setCode] = useState('');
     const [myCode, setMyCode] = useState('');
     const [profile, setProfile] = useState<UserProfile | null>(null);
-
-    // New Fields
     const [partnerName, setPartnerName] = useState('');
+    const [avatarUri, setAvatarUri] = useState<string | null>(null);
+    const [showThemePicker, setShowThemePicker] = useState(false);
     const [alertConfig, setAlertConfig] = useState<{
         visible: boolean;
         title: string;
@@ -31,16 +33,41 @@ export default function ConnectScreen() {
 
     const loadProfile = async () => {
         let p = await StorageService.getProfile();
-        // Fallback create if somehow missing (should be handled by StorageService now)
         if (!p) {
             p = await StorageService.createProfile();
         }
         setProfile(p);
         setMyCode(p.partnerCode);
 
-        // Load existing partner connection data
+        // Load existing data
         if (p.partnerName) setPartnerName(p.partnerName);
-        if (p.connectedPartnerCode) setCode(p.connectedPartnerCode); // Load the saved partner code
+        if (p.connectedPartnerCode) setCode(p.connectedPartnerCode);
+        if (p.avatarUri) setAvatarUri(p.avatarUri);
+    };
+
+    const handlePickImage = async () => {
+        try {
+            const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+            if (!permission.granted) {
+                Alert.alert('Permission Required', 'Please allow access to your photos to set a profile picture.');
+                return;
+            }
+
+            const result = await ImagePicker.launchImageLibraryAsync({
+                mediaTypes: 'images',
+                allowsEditing: true,
+                aspect: [1, 1],
+                quality: 0.8,
+            });
+
+            if (!result.canceled && result.assets[0]) {
+                const uri = result.assets[0].uri;
+                setAvatarUri(uri);
+                await StorageService.updateAvatar(uri);
+            }
+        } catch (error) {
+            console.error('Image picker error:', error);
+        }
     };
 
     const handleConnect = async () => {
@@ -129,7 +156,37 @@ export default function ConnectScreen() {
         <View style={[styles.container, { backgroundColor: theme.background }]}>
             <ScreenHeader title="Settings" showBack />
             <ScrollView contentContainerStyle={styles.content}>
-                <OutlinedCard style={styles.card}>
+                {/* Profile Section */}
+                <OutlinedCard style={[styles.card, { backgroundColor: theme.card }]}>
+                    <ThemedText type="subtitle" style={[styles.label, { color: theme.textSecondary }]}>Profile</ThemedText>
+                    <TouchableOpacity style={styles.avatarSection} onPress={handlePickImage}>
+                        <View style={[styles.avatarContainer, { backgroundColor: theme.primary }]}>
+                            {avatarUri ? (
+                                <Image source={{ uri: avatarUri }} style={styles.avatarImage} />
+                            ) : (
+                                <Ionicons name="person" size={48} color="#FFF" />
+                            )}
+                        </View>
+                        <View style={styles.avatarBadge}>
+                            <Ionicons name="camera" size={16} color="#FFF" />
+                        </View>
+                    </TouchableOpacity>
+                    <ThemedText style={[styles.hint, { color: theme.textSecondary }]}>Tap to change profile picture</ThemedText>
+                </OutlinedCard>
+
+                {/* Theme Section */}
+                <OutlinedCard style={[styles.card, { backgroundColor: theme.card }]}>
+                    <ThemedText type="subtitle" style={[styles.label, { color: theme.textSecondary }]}>Appearance</ThemedText>
+                    <TouchableOpacity
+                        style={[styles.themeButton, { backgroundColor: theme.primary }]}
+                        onPress={() => setShowThemePicker(true)}
+                    >
+                        <Ionicons name="color-palette" size={20} color="#FFF" />
+                        <Text style={styles.themeButtonText}>Customize Theme</Text>
+                    </TouchableOpacity>
+                </OutlinedCard>
+
+                <OutlinedCard style={[styles.card, { backgroundColor: theme.card }]}>
                     <ThemedText type="subtitle" style={styles.label}>My Code</ThemedText>
                     <TouchableOpacity style={styles.codeContainer} onPress={handleShare}>
                         <ThemedText type="title" style={styles.code}>{myCode}</ThemedText>
@@ -244,6 +301,11 @@ export default function ConnectScreen() {
                 message={alertConfig.message}
                 options={alertConfig.options}
                 onClose={() => setAlertConfig({ ...alertConfig, visible: false })}
+            />
+
+            <ThemePickerModal
+                visible={showThemePicker}
+                onClose={() => setShowThemePicker(false)}
             />
         </View>
     );
@@ -395,5 +457,59 @@ const styles = StyleSheet.create({
         fontSize: 12,
         color: '#8E8E93',
         marginTop: 24,
-    }
+    },
+    avatarSection: {
+        alignItems: 'center',
+        marginVertical: 16,
+        position: 'relative',
+    },
+    avatarContainer: {
+        width: 100,
+        height: 100,
+        borderRadius: 50,
+        alignItems: 'center',
+        justifyContent: 'center',
+        overflow: 'hidden',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.2,
+        shadowRadius: 8,
+        elevation: 5,
+    },
+    avatarImage: {
+        width: '100%',
+        height: '100%',
+    },
+    avatarBadge: {
+        position: 'absolute',
+        bottom: 0,
+        right: '35%',
+        width: 32,
+        height: 32,
+        borderRadius: 16,
+        backgroundColor: '#4B6EFF',
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderWidth: 3,
+        borderColor: '#FFF',
+    },
+    themeButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 16,
+        borderRadius: 24,
+        gap: 12,
+        marginTop: 8,
+        shadowColor: "#4B6EFF",
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.2,
+        shadowRadius: 8,
+        elevation: 4,
+    },
+    themeButtonText: {
+        color: '#FFF',
+        fontWeight: '600',
+        fontSize: 16,
+    },
 });

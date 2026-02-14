@@ -9,14 +9,17 @@ import OutlinedCard from './ui/OutlinedCard';
 interface WidgetCardProps {
     note: Note | null;
     onPress: () => void;
+    partnerName?: string;
+    myUserId?: string;
 }
 
 const { width, height } = Dimensions.get('window');
 const CARD_HEIGHT = height * 0.5;
 const CARD_WIDTH = width - 48;
 
-export default function WidgetCard({ note, onPress }: WidgetCardProps) {
+export default function WidgetCard({ note, onPress, partnerName = 'Partner', myUserId }: WidgetCardProps) {
     const { theme } = useTheme();
+    const isMyNote = note?.userId === myUserId;
 
     const renderContent = () => {
         if (!note) {
@@ -101,23 +104,43 @@ export default function WidgetCard({ note, onPress }: WidgetCardProps) {
 
     return (
         <TouchableOpacity activeOpacity={0.9} onPress={onPress}>
-            <OutlinedCard style={styles.card}>
+            <OutlinedCard style={[styles.card, { backgroundColor: theme.card }]}>
                 <View style={styles.cardHeader}>
-                    <Text style={styles.cardTitle}>Daily Note</Text>
-                    {/* Updated menu icon color to match theme (Deep Blue) */}
-                    <Ionicons name="ellipsis-horizontal" size={24} color="#4B6EFF" />
+                    <View style={styles.headerLeft}>
+                        {note && (
+                            <View style={[
+                                styles.senderBadge,
+                                { backgroundColor: isMyNote ? theme.primary + '15' : theme.tint + '15' }
+                            ]}>
+                                <Ionicons
+                                    name={isMyNote ? 'person' : 'heart'}
+                                    size={14}
+                                    color={isMyNote ? theme.primary : theme.tint}
+                                />
+                                <Text style={[styles.senderText, { color: isMyNote ? theme.primary : theme.tint }]}>
+                                    {isMyNote ? 'You' : partnerName}
+                                </Text>
+                            </View>
+                        )}
+                        <Text style={[styles.cardTitle, { color: theme.text }]}>
+                            {note ? 'Latest Note' : 'No Notes Yet'}
+                        </Text>
+                    </View>
+                    <Ionicons name="ellipsis-horizontal" size={24} color={theme.textSecondary} />
                 </View>
 
                 {renderContent()}
 
-                <View style={styles.footer}>
-                    <View style={styles.badge}>
-                        <Ionicons name="time" size={14} color="#8E8E93" style={{ marginRight: 4 }} />
-                        <Text style={styles.badgeText}>
-                            {note ? new Date(note.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Now'}
-                        </Text>
+                {note && (
+                    <View style={styles.footer}>
+                        <View style={[styles.badge, { backgroundColor: theme.background }]}>
+                            <Ionicons name="time" size={14} color={theme.textSecondary} style={{ marginRight: 4 }} />
+                            <Text style={[styles.badgeText, { color: theme.textSecondary }]}>
+                                {new Date(note.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            </Text>
+                        </View>
                     </View>
-                </View>
+                )}
             </OutlinedCard>
         </TouchableOpacity>
     );
