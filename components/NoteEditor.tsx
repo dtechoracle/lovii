@@ -1,15 +1,16 @@
 import { useTheme } from '@/context/ThemeContext';
 import { Ionicons } from '@expo/vector-icons';
 import React, { useRef, useState } from 'react';
-import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActionSheetIOS, Alert, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import ViewShot from 'react-native-view-shot';
 import Canvas, { PathData } from './Canvas';
 import ScreenHeader from './ScreenHeader';
 import OutlinedCard from './ui/OutlinedCard';
 
 interface NoteEditorProps {
-    onSend: (content: string, type: 'text' | 'drawing', color: string) => void;
+    onSend: (content: string, type: 'text' | 'drawing', color: string, sendToWidget?: boolean) => void;
     onCancel: () => void;
+    isSending?: boolean;
 }
 
 const PALETTE = [
@@ -52,7 +53,7 @@ const FONTS = [
     },
 ];
 
-export default function NoteEditor({ onSend, onCancel }: NoteEditorProps) {
+export default function NoteEditor({ onSend, onCancel, isSending = false }: NoteEditorProps) {
     const { theme } = useTheme();
     const [mode, setMode] = useState<'text' | 'drawing'>('drawing');
     const [text, setText] = useState('');
@@ -62,6 +63,7 @@ export default function NoteEditor({ onSend, onCancel }: NoteEditorProps) {
     const [isBold, setIsBold] = useState(false);
     const [isItalic, setIsItalic] = useState(false);
     const [isUnderline, setIsUnderline] = useState(false);
+    const [showSendOptions, setShowSendOptions] = useState(false);
     const viewShotRef = useRef<ViewShot>(null);
 
     const handleUndo = () => {
@@ -75,67 +77,61 @@ export default function NoteEditor({ onSend, onCancel }: NoteEditorProps) {
         setPaths([]);
     };
 
-    const handleSend = async () => {
-        if (mode === 'text') {
-            onSend(text, 'text', selectedColor);
-        } else {
-            // Capture drawing as image
-            // We pass both the raw paths (for app editing/viewing) AND the image (for widget)
-            // But for now, let's just use the image as content for simplicity in widget logic,
-            // OR we store paths in content and image in a new field.
-            // Actually, existing logic expects content to be JSON string of paths.
-            // We'll handle the widget image generation here and pass it.
-
-            // Wait a tick for render
-            try {
-                if (viewShotRef.current && (viewShotRef.current as any).capture) {
-                    const uri = await (viewShotRef.current as any).capture();
-                    // Convert to base64 if needed, OR just pass URI if local. 
-                    // Widget needs base64. view-shot can return base64.
-
-                    // Actually, let's stick to the plan:
-                    // 1. Save paths as content (so app can edit/view later)
-                    // 2. We need a way to pass the image to the widget.
-                    // The easiest way is to modify onSend to accept an optional imageURI/Base64.
-
-                    // For now, let's conform to existing signature.
-                    // We can't easily change the signature without changing `editor.tsx`.
-                    // BUT `content` is just a string. Maybe we can pack it?
-                    // No, cleaner to change the interface.
-
-                    // Let's assume we capture base64
-                    const result = await (viewShotRef.current as any).capture();
-                    // For the widget, we need base64.
-                    // Re-capture as data-uri
-                    // options={{ format: "jpg", quality: 0.9, result: "data-uri" }}
+    const showSendOptionsMenu = () => {
+        if (Platform.OS === 'ios') {
+            ActionSheetIOS.showActionSheetWithOptions(
+                {
+                    options: ['Cancel', 'Save Locally', 'Send to Partner\'s Widget'],
+                    cancelButtonIndex: 0,
+                },
+                (buttonIndex) => {
+                    if (buttonIndex === 1) {
+                        // Save locally
+                        executeSend(false);
+                    } else if (buttonIndex === 2) {
+                        // Send to partner's widget
+                        executeSend(true);
+                    }
                 }
-            } catch (e) {
-                console.log("Failed to capture", e);
-            }
-
-            onSend(JSON.stringify(paths), 'drawing', selectedColor);
+            );
+        } else {
+            // Android - use Alert with buttons
+            Alert.alert(
+                'How would you like to send this note?',
+                'Choose where to save your note',
+                [
+                    { text: 'Cancel', style: 'cancel' },
+                    { text: 'Save Locally', onPress: () => executeSend(false) },
+                    { text: 'Send to Partner\'s Widget', onPress: () => executeSend(true) },
+                ],
+                { cancelable: true }
+            );
         }
     };
 
-    const handleDrawingSend = async () => {
-        try {
-            let imageBase64 = null;
-            if (viewShotRef.current && (viewShotRef.current as any).capture) {
-                imageBase64 = await (viewShotRef.current as any).capture();
+    const executeSend = async (sendToWidget: boolean) => {
+        if (mode === 'text') {
+            onSend(text, 'text', selectedColor, sendToWidget);
+        } else {
+            try {
+                let imageBase64 = null;
+                if (viewShotRef.current && (viewShotRef.current as any).capture) {
+                    imageBase64 = await (viewShotRef.current as any).capture();
+                }
+
+                const contentObj = {
+                    paths,
+                    preview: imageBase64
+                };
+
+                onSend(JSON.stringify(contentObj), 'drawing', selectedColor, sendToWidget);
+
+            } catch (e) {
+                console.error(e);
+                onSend(JSON.stringify({ paths }), 'drawing', selectedColor, sendToWidget);
             }
-
-            const contentObj = {
-                paths,
-                preview: imageBase64
-            };
-
-            onSend(JSON.stringify(contentObj), 'drawing', selectedColor);
-
-        } catch (e) {
-            console.error(e);
-            onSend(JSON.stringify({ paths }), 'drawing', selectedColor);
         }
-    }
+    };
 
     return (
         <KeyboardAvoidingView
@@ -163,8 +159,12 @@ export default function NoteEditor({ onSend, onCancel }: NoteEditorProps) {
                     </View>
                 }
                 rightAction={
-                    <TouchableOpacity onPress={mode === 'drawing' ? handleDrawingSend : handleSend} style={[styles.sendBtn, { backgroundColor: theme.primary }]}>
-                        <Text style={styles.sendText}>Send</Text>
+                    <TouchableOpacity
+                        onPress={showSendOptionsMenu}
+                        style={[styles.sendBtn, { backgroundColor: theme.primary }]}
+                        disabled={isSending}
+                    >
+                        <Text style={styles.sendText}>{isSending ? 'Sending...' : 'Send'}</Text>
                     </TouchableOpacity>
                 }
             />
