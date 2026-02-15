@@ -130,6 +130,30 @@ export const StorageService = {
         }
     },
 
+    async updateThemePreference(preference: 'ocean' | 'sunset' | 'lavender' | 'mint' | 'auto'): Promise<void> {
+        const p = await this.getProfile();
+        if (p) {
+            p.themePreference = preference;
+            await this.saveProfile(p);
+        }
+    },
+
+    async updateThemeMode(mode: 'light' | 'dark' | 'auto'): Promise<void> {
+        const p = await this.getProfile();
+        if (p) {
+            p.themeMode = mode;
+            await this.saveProfile(p);
+        }
+    },
+
+    async updateAvatar(uri: string): Promise<void> {
+        const p = await this.getProfile();
+        if (p) {
+            p.avatarUri = uri;
+            await this.saveProfile(p);
+        }
+    },
+
     async recoverProfile(code: string): Promise<boolean> {
         try {
             // Attempt to find profile by code
@@ -457,7 +481,20 @@ export const StorageService = {
         await AsyncStorage.clear();
     },
 
-    async sendToPartnerWidget(note: Note): Promise<{ success: boolean; error?: string }> {
+    async sendToPartnerWidget(note: Note): Promise<{
+        success: boolean;
+        error?: string;
+        partner?: {
+            id: string;
+            name: string;
+            code: string;
+            connected: boolean;
+        };
+        partnerWidget?: {
+            hasNote: boolean;
+            lastNote: any;
+        };
+    }> {
         try {
             const profileId = await AsyncStorage.getItem(KEYS.PROFILE_ID);
             if (!profileId) {
@@ -474,32 +511,78 @@ export const StorageService = {
             const updatedNotes = [note, ...localNotes];
             await AsyncStorage.setItem(KEYS.LOCAL_NOTES, JSON.stringify(updatedNotes));
 
-            // 2. Send to backend so partner can fetch it
-            console.log('[sendToPartnerWidget] Sending to backend...');
-            const response = await fetch(`${API_URL}/notes?profileId=${profileId}`, {
+            // 2. Send to backend via widget API (verifies partner and fetches their widget status)
+            console.log('[sendToPartnerWidget] Sending to backend via widget API...');
+            const response = await fetch(`${API_URL}/widget`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    profileId, // THIS IS MY ID (sending in both body and query to be safe)
-                    ...note
+                    myId: profileId,
+                    note
                 }),
             });
 
             if (!response.ok) {
                 const status = response.status;
-                const errorText = await response.text();
+                let errorText = 'Unknown error';
+                try {
+                    const errorJson = await response.json();
+                    errorText = errorJson.error || errorText;
+
+                    // Handle specific error cases
+                    if (errorText.includes('No partner connected')) {
+                        return { success: false, error: 'No partner connected. Connect a partner first!' };
+                    }
+                    if (errorText.includes('Partner profile not found')) {
+                        return { success: false, error: 'Partner not found in database. They may need to create an account.' };
+                    }
+                } catch (e) {
+                    errorText = await response.text();
+                }
+
                 console.error('[sendToPartnerWidget] Backend error:', status, errorText);
-                return { success: false, error: `Server Error (${status}): ${errorText.slice(0, 50)}` };
+                return { success: false, error: `Server Error (${status}): ${errorText.slice(0, 100)}` };
             }
 
-            console.log('[sendToPartnerWidget] Successfully sent to backend');
-            return { success: true };
+            const result = await response.json();
+            console.log('[sendToPartnerWidget] Successfully sent! Partner widget status:', result.partnerWidget);
+
+            return {
+                success: true,
+                partner: result.partner,
+                partnerWidget: result.partnerWidget
+            };
         } catch (error) {
             console.error('[sendToPartnerWidget] Exception:', error);
             if (error instanceof TypeError && error.message.includes('Network request failed')) {
                 return { success: false, error: 'Network Error: Check internet connection.' };
             }
             return { success: false, error: String(error) };
+        }
+    },
+
+    async getPartnerWidgetStatus(): Promise<{
+        connected: boolean;
+        partner: { id: string; name: string; code: string } | null;
+        widget: { hasNote: boolean; lastNote: any } | null;
+    }> {
+        try {
+            const profileId = await AsyncStorage.getItem(KEYS.PROFILE_ID);
+            if (!profileId) {
+                return { connected: false, partner: null, widget: null };
+            }
+
+            const response = await fetch(`${API_URL}/widget?myId=${profileId}`);
+            if (!response.ok) {
+                console.error('[getPartnerWidgetStatus] Error:', response.status);
+                return { connected: false, partner: null, widget: null };
+            }
+
+            const result = await response.json();
+            return result;
+        } catch (error) {
+            console.error('[getPartnerWidgetStatus] Exception:', error);
+            return { connected: false, partner: null, widget: null };
         }
     },
 
