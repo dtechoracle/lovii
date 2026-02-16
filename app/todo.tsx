@@ -78,7 +78,7 @@ export default function TodoScreen() {
                                     </View>
                                 )}
                                 {item.dueDate && (
-                                    <View style={[styles.dueBadge, isOverdue && { backgroundColor: theme.error + '15' }]}>
+                                    <View style={[styles.dueBadge, isOverdue ? { backgroundColor: theme.error + '15' } : undefined]}>
                                         <Ionicons name="calendar-outline" size={10} color={isOverdue ? theme.error : theme.textSecondary} />
                                         <Text style={[styles.badgeText, { color: isOverdue ? theme.error : theme.textSecondary }]}>
                                             {new Date(item.dueDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}

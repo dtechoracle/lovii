@@ -119,8 +119,10 @@ export function AndroidWidget({
                     />
                 ) : imageSource ? (
                     <ImageWidget
-                        image={imageSource} // Correct prop is 'image', not 'imageData' for base64 in some versions, checking docs is hard but 'image' is standard for base64 or url
-                        imageFormat="png"
+                        image={imageSource as any} // Correct prop is 'image'
+
+                        imageWidth={120}
+                        imageHeight={120}
                         style={{
                             width: 120, // localized fix size or match_parent with constraints
                             height: 120

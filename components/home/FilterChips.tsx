@@ -1,4 +1,3 @@
-import { Colors } from '@/constants/theme';
 import React from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
@@ -49,8 +48,8 @@ const styles = StyleSheet.create({
         borderColor: '#2C2C2E',
     },
     chipSelected: {
-        backgroundColor: Colors.dark.primary, // Yellow
-        borderColor: Colors.dark.primary,
+        backgroundColor: '#FFD60A', // Yellow
+        borderColor: '#FFD60A',
     },
     text: {
         color: '#8E8E93',

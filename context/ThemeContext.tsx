@@ -11,6 +11,7 @@ interface ThemeContextType {
     isDark: boolean;
     setThemePreference: (preference: ThemePreference) => Promise<void>;
     setThemeMode: (mode: ThemeMode) => Promise<void>;
+    setGender: (gender: 'male' | 'female') => Promise<void>;
 }
 
 const ThemeContext = createContext<ThemeContextType>({
@@ -20,6 +21,7 @@ const ThemeContext = createContext<ThemeContextType>({
     isDark: false,
     setThemePreference: async () => { },
     setThemeMode: async () => { },
+    setGender: async () => { },
 });
 
 export const useTheme = () => useContext(ThemeContext);
@@ -35,7 +37,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 
     const loadThemePreferences = async () => {
         const profile = await StorageService.getProfile();
-        
+
         // Migration: Convert old gender-based themes to new system
         if (profile?.gender && !profile?.themePreference) {
             const migratedTheme: ThemePreference = profile.gender === 'female' ? 'sunset' : 'ocean';
@@ -70,6 +72,14 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
         return isDark ? palette.dark : palette.light;
     };
 
+    const setGender = async (gender: 'male' | 'female') => {
+        // Find associated theme
+        const theme = gender === 'female' ? 'sunset' : 'ocean';
+        setThemePreferenceState(theme);
+        await StorageService.updateLocalGender(gender);
+        await StorageService.updateThemePreference(theme); // Also update theme pref
+    };
+
     return (
         <ThemeContext.Provider value={{
             theme: getActivePalette(),
@@ -78,6 +88,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
             isDark,
             setThemePreference,
             setThemeMode,
+            setGender,
         }}>
             {children}
         </ThemeContext.Provider>

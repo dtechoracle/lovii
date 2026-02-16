@@ -28,7 +28,7 @@ export default function DrawingViewer({ paths, color, width, height, strokeWidth
             drawingPaths = paths as PathData[];
         } else {
             // Legacy string[] format - convert to PathData[]
-            drawingPaths = (paths as string[]).map(p => ({ path: p, color }));
+            drawingPaths = (paths as string[]).map((p: string) => ({ path: p, color }));
         }
     } else if (typeof paths === 'string') {
         try {
@@ -44,7 +44,7 @@ export default function DrawingViewer({ paths, color, width, height, strokeWidth
                 if (parsed.paths.length > 0 && typeof parsed.paths[0] === 'object') {
                     drawingPaths = parsed.paths;
                 } else {
-                    drawingPaths = parsed.paths.map(p => ({ path: p, color }));
+                    drawingPaths = parsed.paths.map((p: string) => ({ path: p, color }));
                 }
             }
         } catch (e) {

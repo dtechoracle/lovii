@@ -45,10 +45,10 @@ export default function ConnectScreen() {
         if (p.partnerName) setPartnerName(p.partnerName);
         if (p.connectedPartnerCode) setCode(p.connectedPartnerCode);
         if (p.avatarUri) setAvatarUri(p.avatarUri);
-        
+
         // Set initial connection status based on whether we have a verified partner ID
         // A real partner ID won't start with 'partner_' (that's just a temporary placeholder)
-        if (p.partnerId && !p.partnerId.startsWith('partner_')) {
+        if (p.connectedPartnerId && !p.connectedPartnerId.startsWith('partner_')) {
             setConnectionStatus('connected');
         } else {
             setConnectionStatus('none');
@@ -111,7 +111,7 @@ export default function ConnectScreen() {
 
                 // Try to connect to partner
                 const success = await StorageService.connectToPartner(code);
-                
+
                 if (!success) {
                     console.log('Connection failed');
                     setConnectionStatus('failed');
@@ -120,10 +120,10 @@ export default function ConnectScreen() {
                         title: 'Connection Failed',
                         message: 'Could not find a partner with that code. Please check the code and try again.',
                         options: [{
-                            text: 'OK', 
+                            text: 'OK',
                             onPress: () => {
                                 setCode(''); // Clear the invalid code
-                            }, 
+                            },
                             style: 'cancel'
                         }]
                     });
@@ -142,12 +142,12 @@ export default function ConnectScreen() {
                     visible: true,
                     title: '🎉 Connected!',
                     message: `You're now connected to ${latest?.partnerName || 'your partner'}!`,
-                    options: [{ 
-                        text: 'OK', 
+                    options: [{
+                        text: 'OK',
                         onPress: () => {
                             setCode(''); // Clear the code input after successful connection
-                        }, 
-                        style: 'cancel' 
+                        },
+                        style: 'cancel'
                     }]
                 });
             } else if (partnerName) {
@@ -286,8 +286,8 @@ export default function ConnectScreen() {
                         </View>
                     )}
 
-                    <TouchableOpacity 
-                        style={[styles.button, isConnecting && styles.buttonDisabled]} 
+                    <TouchableOpacity
+                        style={[styles.button, isConnecting && styles.buttonDisabled]}
                         onPress={handleConnect}
                         disabled={isConnecting}
                     >

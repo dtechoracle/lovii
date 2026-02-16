@@ -16,9 +16,14 @@ export async function POST(request: Request) {
         }
 
         // Link me to partner
-        await db.update(profiles)
+        const [myUpdate] = await db.update(profiles)
             .set({ partnerId: partner.id })
-            .where(eq(profiles.id, myId));
+            .where(eq(profiles.id, myId))
+            .returning();
+
+        if (!myUpdate) {
+            return Response.json({ error: 'Your profile not found. Please save changes first.' }, { status: 404 });
+        }
 
         // Link partner to me
         await db.update(profiles)

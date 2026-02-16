@@ -40,7 +40,7 @@ export default function CollageScreen() {
             const newImages = result.assets.map(asset => asset.uri);
             const totalImages = [...images, ...newImages].slice(0, MAX_IMAGES);
             setImages(totalImages);
-            
+
             if (totalImages.length >= MAX_IMAGES) {
                 Alert.alert("Maximum Reached", `You've reached the maximum of ${MAX_IMAGES} images.`);
             }
@@ -68,7 +68,7 @@ export default function CollageScreen() {
                 );
 
                 const base64 = await FileSystem.readAsStringAsync(manipulated.uri, {
-                    encoding: FileSystem.EncodingType.Base64,
+                    encoding: 'base64',
                 });
 
                 processedImages.push(`data:image/jpeg;base64,${base64}`);
@@ -124,9 +124,9 @@ export default function CollageScreen() {
                                     } else if (index === images.length && canAddMore) {
                                         // Show "Add" button only for the next available slot
                                         return (
-                                            <TouchableOpacity 
-                                                key={index} 
-                                                style={[styles.addBtn, { backgroundColor: theme.background }]} 
+                                            <TouchableOpacity
+                                                key={index}
+                                                style={[styles.addBtn, { backgroundColor: theme.background }]}
                                                 onPress={pickImage}
                                             >
                                                 <Ionicons name="add" size={32} color={theme.primary} />
