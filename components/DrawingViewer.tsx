@@ -37,7 +37,7 @@ export default function DrawingViewer({ paths, color, width, height, strokeWidth
                 if (parsed.length > 0 && typeof parsed[0] === 'object' && 'path' in parsed[0]) {
                     drawingPaths = parsed;
                 } else {
-                    drawingPaths = parsed.map(p => ({ path: p, color }));
+                    drawingPaths = parsed.map((p: string) => ({ path: p, color }));
                 }
             } else if (parsed.paths && Array.isArray(parsed.paths)) {
                 // Handle {paths: [...], preview: ...} format

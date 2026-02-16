@@ -120,7 +120,6 @@ export function AndroidWidget({
                 ) : imageSource ? (
                     <ImageWidget
                         image={imageSource as any} // Correct prop is 'image'
-
                         imageWidth={120}
                         imageHeight={120}
                         style={{
