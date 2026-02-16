@@ -47,34 +47,21 @@
           }
         ],
         [
-          "react-native-widget-extension",
-          {
-            "widgetsFolder": "widgets",
-            "deploymentTarget": "14.0",
-            "frequentUpdates": true,
-            "ios": {
-              "src": "widgets/ios",
-              "mode": "production",
-              "devTeamId": "",
-              "appleTeamId": "",
-              "deploymentTarget": "14.0"
-            },
-            "android": {
-              "src": "widgets/android",
+          [
+            "react-native-android-widget",
+            {
               "widgets": [
                 {
                   "name": "LoviiWidget",
-                  "label": "Partner's Note",
+                  "label": "Partner Note",
+                  "minWidth": 320,
+                  "minHeight": 120,
                   "description": "See your partner's latest note",
-                  "minWidth": "2x2",
-                  "maxWidth": "4x4",
-                  "minHeight": "2x2",
-                  "maxHeight": "4x4",
                   "previewImage": "./assets/images/widget-preview.png"
                 }
               ]
             }
-          }
+          ]
         ]
       ],
       "experiments": {
