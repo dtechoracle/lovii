@@ -7,11 +7,18 @@ import { Note, StorageService } from '@/services/storage';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { Alert, FlatList, Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, FlatList, Image, Platform, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function HistoryScreen() {
     const router = useRouter();
     const { theme } = useTheme();
+    const insets = useSafeAreaInsets();
+
+    // Robust top padding: (SafeArea OR StatusBar) + extra buffer
+    const androidStatusBar = Platform.OS === 'android' ? (StatusBar.currentHeight || 24) : 0;
+    const topPadding = Math.max(insets.top, androidStatusBar) + 20;
+
     const [history, setHistory] = useState<Note[]>([]);
     const [selectedNote, setSelectedNote] = useState<Note | null>(null);
     const [optionsVisible, setOptionsVisible] = useState(false);
@@ -124,8 +131,11 @@ export default function HistoryScreen() {
     );
 
     return (
-        <View style={styles.container}>
-            <ScreenHeader title="Timeline" showBack />
+        <View style={[styles.container, { paddingTop: insets.top }]}>
+            {/* <Text>Hello</Text> */}
+            <View style={{ paddingTop: 10 }}>
+                <ScreenHeader title="Timeline" showBack />
+            </View>
             <FlatList
                 data={history}
                 renderItem={renderItem}
@@ -152,8 +162,8 @@ export default function HistoryScreen() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        paddingTop: 60,
-        backgroundColor: '#F2F2F7', // Force light grey background
+        backgroundColor: '#F2F2F7',
+        paddingTop: 30,
     },
     list: {
         padding: 24,
@@ -199,7 +209,7 @@ const styles = StyleSheet.create({
         textTransform: 'capitalize',
     },
     content: {
-        color: '#1C1C1E', // Enforce Dark Text
+        color: '#1C1C1E',
         fontSize: 16,
         fontWeight: '500',
         lineHeight: 24,

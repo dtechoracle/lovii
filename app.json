@@ -29,69 +29,51 @@
       "package": "com.dtechoracle.lovii"
     },
     "web": {
-      "output": "static",
+      "output": "server",
       "bundler": "metro",
-      "favicon": "./assets/images/favicon.png",
-      "plugins": [
-        "expo-router",
-        [
-          "expo-splash-screen",
-          {
-            "image": "./assets/images/splash-icon.png",
-            "imageWidth": 200,
-            "resizeMode": "contain",
-            "backgroundColor": "#ffffff",
-            "dark": {
-              "backgroundColor": "#000000"
-            }
+      "favicon": "./assets/images/favicon.png"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/images/splash-icon.png",
+          "imageWidth": 200,
+          "resizeMode": "contain",
+          "backgroundColor": "#ffffff",
+          "dark": {
+            "backgroundColor": "#000000"
           }
-        ],
-        [
-          [
-            "react-native-android-widget",
+        }
+      ],
+      [
+        "react-native-android-widget",
+        {
+          "widgets": [
             {
-              "widgets": [
-                {
-                  "name": "LoviiWidget",
-                  "label": "Partner Note",
-                  "minWidth": 320,
-                  "minHeight": 120,
-                  "description": "See your partner's latest note",
-                  "previewImage": "./assets/images/widget-preview.png"
-                }
-              ]
+              "name": "LoviiWidget",
+              "label": "Partner Note",
+              "minWidth": 320,
+              "minHeight": 120,
+              "description": "See your partner's latest note",
+              "previewImage": "./assets/images/widget-preview.png"
             }
           ]
-        ]
-      ],
-      "experiments": {
-        "typedRoutes": true,
-        "reactCompiler": true
-      },
-      "extra": {
-        "router": {},
-        "eas": {
-          "build": {
-            "experimental": {
-              "ios": {
-                "appExtensions": [
-                  {
-                    "targetName": "loviiWidgets",
-                    "bundleIdentifier": "com.dtechoracle.lovii.loviiWidgets",
-                    "entitlements": {}
-                  }
-                ]
-              }
-            }
-          },
-          "projectId": "a0a03da8-f568-4d1d-b878-3ed96319155d"
         }
-      }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true,
+      "reactCompiler": true
     },
     "extra": {
+      "router": {},
+      "apiUrl": "https://lovii1.vercel.app/api",
       "eas": {
-        "projectId": "a0a03da8-f568-4d1d-b878-3ed96319155d"
+        "projectId": "78bbaad6-861d-42b6-bf92-a44827c93477"
       }
-    }
+    },
+    "owner": "dtechoracle1"
   }
 }

@@ -1,6 +1,6 @@
 import { db } from "@/db";
-import { notes, profiles } from "@/db/schema";
-import { eq } from "drizzle-orm";
+import { connections, notes, users } from "@/db/schema";
+import { desc, eq, or } from "drizzle-orm";
 
 // Send a note to partner's widget
 export async function POST(request: Request) {
@@ -15,45 +15,38 @@ export async function POST(request: Request) {
       );
     }
 
-    // 1. Fetch my profile to get partnerId
-    const myProfile = await db.query.profiles.findFirst({
-      where: eq(profiles.id, myId),
+    // 1. Verify User exists
+    const me = await db.query.users.findFirst({
+      where: eq(users.id, myId)
+    });
+    if (!me) return Response.json({ error: "User not found" }, { status: 404 });
+
+    // 2. Find Connection
+    const connection = await db.query.connections.findFirst({
+      where: or(
+        eq(connections.userA, myId),
+        eq(connections.userB, myId)
+      )
     });
 
-    if (!myProfile) {
-      return Response.json({ error: "Profile not found" }, { status: 404 });
+    if (!connection) {
+      return Response.json({ error: "No partner connected" }, { status: 400 });
     }
 
-    if (!myProfile.partnerId) {
-      return Response.json(
-        {
-          error: "No partner connected",
-          connected: false,
-        },
-        { status: 400 }
-      );
-    }
-
-    // 2. Verify partner exists in database
-    const partnerProfile = await db.query.profiles.findFirst({
-      where: eq(profiles.id, myProfile.partnerId),
+    const partnerId = connection.userA === myId ? connection.userB : connection.userA;
+    const partner = await db.query.users.findFirst({
+      where: eq(users.id, partnerId)
     });
 
-    if (!partnerProfile) {
-      return Response.json(
-        {
-          error: "Partner profile not found in database",
-          connected: false,
-        },
-        { status: 404 }
-      );
+    if (!partner) {
+      return Response.json({ error: "Partner not found in database" }, { status: 404 });
     }
 
-    // 3. Save the note to my account (so partner can see it)
+    // 3. Save the note to my account (author = me)
     const [savedNote] = await db
       .insert(notes)
       .values({
-        profileId: myId,
+        userId: myId,  // Author is ME
         type: note.type,
         content: note.content,
         color: note.color,
@@ -64,10 +57,10 @@ export async function POST(request: Request) {
       })
       .returning();
 
-    // 4. Fetch partner's current widget status (their latest note to me)
+    // 4. Fetch partner's latest note (author = partner)
     const partnerLatestNote = await db.query.notes.findFirst({
-      where: eq(notes.profileId, myProfile.partnerId),
-      orderBy: (notes, { desc }) => [desc(notes.timestamp)],
+      where: eq(notes.userId, partnerId),
+      orderBy: [desc(notes.timestamp)],
     });
 
     // 5. Return success with partner info
@@ -75,20 +68,20 @@ export async function POST(request: Request) {
       success: true,
       note: savedNote,
       partner: {
-        id: partnerProfile.id,
-        name: partnerProfile.name,
-        code: partnerProfile.partnerCode,
+        id: partner.id,
+        name: partner.name,
+        code: partner.code,
         connected: true,
       },
       partnerWidget: {
         hasNote: !!partnerLatestNote,
         lastNote: partnerLatestNote
           ? {
-              type: partnerLatestNote.type,
-              content: partnerLatestNote.content,
-              timestamp: partnerLatestNote.timestamp,
-              color: partnerLatestNote.color,
-            }
+            type: partnerLatestNote.type,
+            content: partnerLatestNote.content,
+            timestamp: partnerLatestNote.timestamp,
+            color: partnerLatestNote.color,
+          }
           : null,
       },
     });
@@ -111,12 +104,15 @@ export async function GET(request: Request) {
       return Response.json({ error: "myId required" }, { status: 400 });
     }
 
-    // 1. Get my profile
-    const myProfile = await db.query.profiles.findFirst({
-      where: eq(profiles.id, myId),
+    // 1. Find Connection
+    const connection = await db.query.connections.findFirst({
+      where: or(
+        eq(connections.userA, myId),
+        eq(connections.userB, myId)
+      )
     });
 
-    if (!myProfile || !myProfile.partnerId) {
+    if (!connection) {
       return Response.json({
         connected: false,
         partner: null,
@@ -124,12 +120,12 @@ export async function GET(request: Request) {
       });
     }
 
-    // 2. Get partner profile
-    const partnerProfile = await db.query.profiles.findFirst({
-      where: eq(profiles.id, myProfile.partnerId),
+    const partnerId = connection.userA === myId ? connection.userB : connection.userA;
+    const partner = await db.query.users.findFirst({
+      where: eq(users.id, partnerId)
     });
 
-    if (!partnerProfile) {
+    if (!partner) {
       return Response.json({
         connected: false,
         partner: null,
@@ -137,28 +133,28 @@ export async function GET(request: Request) {
       });
     }
 
-    // 3. Get partner's latest note
+    // 2. Get partner's latest note
     const partnerLatestNote = await db.query.notes.findFirst({
-      where: eq(notes.profileId, myProfile.partnerId),
-      orderBy: (notes, { desc }) => [desc(notes.timestamp)],
+      where: eq(notes.userId, partnerId),
+      orderBy: [desc(notes.timestamp)],
     });
 
     return Response.json({
       connected: true,
       partner: {
-        id: partnerProfile.id,
-        name: partnerProfile.name,
-        code: partnerProfile.partnerCode,
+        id: partner.id,
+        name: partner.name,
+        code: partner.code,
       },
       widget: {
         hasNote: !!partnerLatestNote,
         lastNote: partnerLatestNote
           ? {
-              type: partnerLatestNote.type,
-              content: partnerLatestNote.content,
-              timestamp: partnerLatestNote.timestamp,
-              color: partnerLatestNote.color,
-            }
+            type: partnerLatestNote.type,
+            content: partnerLatestNote.content,
+            timestamp: partnerLatestNote.timestamp,
+            color: partnerLatestNote.color,
+          }
           : null,
       },
     });

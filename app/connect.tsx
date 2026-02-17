@@ -96,12 +96,12 @@ export default function ConnectScreen() {
 
             // Handle partner code connection (only if code is provided)
             if (code) {
-                // Validate partner code format (6 characters, alphanumeric)
-                if (code.length !== 6) {
+                // Validate partner code format (LOVII- + 6 alphanumeric chars = 12 total)
+                if (code.length !== 12) {
                     setAlertConfig({
                         visible: true,
                         title: 'Invalid Partner Code',
-                        message: 'Partner code must be exactly 6 characters.',
+                        message: 'Partner code must be exactly 12 characters (e.g. LOVII-A7B2X9).',
                         options: [{ text: 'OK', onPress: () => { }, style: 'cancel' }]
                     });
                     setConnectionStatus('failed');
@@ -250,11 +250,11 @@ export default function ConnectScreen() {
                     <ThemedText type="subtitle" style={styles.label}>Partner Code</ThemedText>
                     <TextInput
                         style={styles.input}
-                        placeholder="Ex. X7Y2Z9"
+                        placeholder="Ex. LOVII-A7B2X9"
                         placeholderTextColor="#C7C7CC"
                         value={code}
                         onChangeText={(t) => setCode(t.toUpperCase())}
-                        maxLength={6}
+                        maxLength={12}
                     />
 
 
@@ -306,49 +306,7 @@ export default function ConnectScreen() {
                     </View>
                 </TouchableOpacity>
 
-                {/* Account Recovery */}
-                <View style={styles.divider}>
-                    <View style={styles.line} />
-                    <ThemedText style={styles.or}>Recovery</ThemedText>
-                    <View style={styles.line} />
-                </View>
 
-                <OutlinedCard style={styles.card}>
-                    <ThemedText type="subtitle" style={styles.label}>Restore Account</ThemedText>
-                    <ThemedText style={[styles.hint, { textAlign: 'left', marginBottom: 12 }]}>
-                        Lost your data? Enter your old code to recover your account.
-                    </ThemedText>
-                    <TextInput
-                        style={styles.input}
-                        placeholder="Old Code"
-                        placeholderTextColor="#C7C7CC"
-                        onChangeText={(t) => {
-                            if (t.length === 6) {
-                                Alert.alert(
-                                    "Recover Account?",
-                                    `Attempt to recover account with code ${t}? This will overwrite current data.`,
-                                    [
-                                        { text: "Cancel", style: 'cancel' },
-                                        {
-                                            text: "Recover",
-                                            onPress: async () => {
-                                                const success = await StorageService.recoverProfile(t.toUpperCase());
-                                                if (success) {
-                                                    Alert.alert("Success", "Account recovered! Restarting app...");
-                                                    // Force reload or nav
-                                                    router.replace('/(tabs)');
-                                                } else {
-                                                    Alert.alert("Failed", "Could not find account with that code.");
-                                                }
-                                            }
-                                        }
-                                    ]
-                                )
-                            }
-                        }}
-                        maxLength={6}
-                    />
-                </OutlinedCard>
 
                 <Text style={styles.version}>v1.0.0</Text>
             </ScrollView>

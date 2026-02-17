@@ -1,63 +1,39 @@
 import { db } from '@/db';
-import { profiles } from '@/db/schema';
-import { eq } from 'drizzle-orm';
+import { connections, users } from '@/db/schema';
+import { eq, or } from 'drizzle-orm';
 
 export async function POST(request: Request) {
-    try {
-        const { name } = await request.json();
-        const partnerCode = Math.random().toString(36).substr(2, 6).toUpperCase();
-
-        const [newProfile] = await db.insert(profiles).values({
-            name,
-            partnerCode,
-        }).returning();
-
-        return Response.json(newProfile);
-    } catch (error) {
-        return Response.json({ error: 'Failed to create profile' }, { status: 500 });
-    }
+    return Response.json({ error: 'Use /api/auth/register to create account' }, { status: 400 });
 }
 
 export async function PUT(request: Request) {
     try {
         const body = await request.json();
-        let { id, name, partnerCode } = body;
+        const { id, name, avatar } = body;
 
         if (!id) {
             return Response.json({ error: 'ID required' }, { status: 400 });
         }
 
-        // SANITIZE: Ensure ID is a valid UUID. If not, generate one.
-        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-        if (!uuidRegex.test(id)) {
-            console.log('[API] Check: Invalid UUID format received:', id);
-            id = crypto.randomUUID();
-            console.log('[API] Generated new UUID:', id);
-        }
-
-        // Upsert: Try insert, on conflict update
-        const [profile] = await db.insert(profiles).values({
-            id,
-            name,
-            partnerCode,
-            // maintain other fields if sent
-            partnerId: body.partnerId,
-            partnerName: body.partnerName,
-            anniversary: body.anniversary
-        })
-            .onConflictDoUpdate({
-                target: profiles.id,
-                set: {
-                    name,
-                    partnerCode,
-                    partnerId: body.partnerId,
-                    partnerName: body.partnerName,
-                    anniversary: body.anniversary
-                }
+        // Update User
+        const [updatedUser] = await db.update(users)
+            .set({
+                name,
+                avatar
             })
+            .where(eq(users.id, id))
             .returning();
 
-        return Response.json(profile);
+        if (!updatedUser) {
+            return Response.json({ error: 'User not found' }, { status: 404 });
+        }
+
+        return Response.json({
+            id: updatedUser.id,
+            name: updatedUser.name,
+            code: updatedUser.code,
+            avatar: updatedUser.avatar
+        });
     } catch (error) {
         console.error('PUT profile error:', error);
         return Response.json({ error: 'Failed to update profile' }, { status: 500 });
@@ -66,23 +42,57 @@ export async function PUT(request: Request) {
 
 export async function GET(request: Request) {
     const url = new URL(request.url);
-    const profileId = url.searchParams.get('id');
+    const id = url.searchParams.get('id');
 
-    if (!profileId) {
-        return Response.json({ error: 'Profile ID required' }, { status: 400 });
+    if (!id) {
+        return Response.json({ error: 'ID required' }, { status: 400 });
     }
 
     try {
-        const profile = await db.query.profiles.findFirst({
-            where: eq(profiles.id, profileId),
+        // Get User
+        const user = await db.query.users.findFirst({
+            where: eq(users.id, id),
         });
 
-        if (!profile) {
-            return Response.json({ error: 'Profile not found' }, { status: 404 });
+        if (!user) {
+            return Response.json({ error: 'User not found' }, { status: 404 });
         }
 
-        return Response.json(profile);
+        // Get Connections to find partner info
+        // We look for any connection where this user is A or B
+        const connection = await db.query.connections.findFirst({
+            where: or(
+                eq(connections.userA, id),
+                eq(connections.userB, id)
+            )
+        });
+
+        let partnerInfo = {};
+        if (connection) {
+            const partnerId = connection.userA === id ? connection.userB : connection.userA;
+            const partner = await db.query.users.findFirst({
+                where: eq(users.id, partnerId)
+            });
+            if (partner) {
+                partnerInfo = {
+                    partnerId: partner.id,
+                    partnerName: partner.name,
+                    partnerCode: partner.code,
+                    connectedAt: connection.createdAt
+                };
+            }
+        }
+
+        return Response.json({
+            id: user.id,
+            name: user.name,
+            code: user.code,
+            avatar: user.avatar,
+            ...partnerInfo
+        });
+
     } catch (error) {
+        console.error('GET profile error:', error);
         return Response.json({ error: 'Failed to fetch profile' }, { status: 500 });
     }
 }

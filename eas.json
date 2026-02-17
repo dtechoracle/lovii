@@ -8,17 +8,26 @@
             "distribution": "internal",
             "android": {
                 "buildType": "apk"
+            },
+            "env": {
+                "EXPO_PUBLIC_API_URL": "https://lovii1.vercel.app/api"
             }
         },
         "preview": {
             "distribution": "internal",
             "android": {
                 "buildType": "apk"
+            },
+            "env": {
+                "EXPO_PUBLIC_API_URL": "https://lovii1.vercel.app/api"
             }
         },
         "production": {
             "android": {
                 "buildType": "app-bundle"
+            },
+            "env": {
+                "EXPO_PUBLIC_API_URL": "https://lovii1.vercel.app/api"
             }
         }
     },

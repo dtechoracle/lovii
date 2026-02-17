@@ -134,8 +134,8 @@ export default function CollageScreen() {
                                             </TouchableOpacity>
                                         );
                                     } else {
-                                        // Empty slot (hidden)
-                                        return <View key={index} style={styles.emptySlot} />;
+                                        // Empty slot (hidden) -> Return null to allow centering
+                                        return null;
                                     }
                                 })}
                             </View>

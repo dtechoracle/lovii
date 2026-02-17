@@ -4,31 +4,28 @@ import { desc, eq } from 'drizzle-orm';
 
 export async function GET(request: Request) {
     const url = new URL(request.url);
-    const profileId = url.searchParams.get('profileId');
-    const partnerId = url.searchParams.get('partnerId');
+    const userId = url.searchParams.get('profileId') || url.searchParams.get('userId'); // Support both for now to ease transition? No, frontend will send profileId because StorageService uses it. Rename param?
+    // StorageService sends `profileId=${profileId}`.
+    // So we map `profileId` query param -> `userId` logic.
 
-    if (!profileId) {
-        return Response.json({ error: 'Profile ID required' }, { status: 400 });
+    // OR we change StorageService to send userId.
+    // Let's assume input param name is legacy 'profileId' but maps to user ID.
+
+    const targetId = userId;
+
+    if (!targetId) {
+        return Response.json({ error: 'User ID required' }, { status: 400 });
     }
 
     try {
-        // Fetch user's own notes OR partner's notes if requested
-        // Logic: 
-        // - If fetching history (my notes + partner notes), normally we fetch both.
-        // - For now, let's keep it simple: client requests specific target.
-
-        // Actually, simplest is to fetch based on `profileId` being the AUTHOR of the note.
-        // Client calls this twice: once for me, once for partner. Or we use OR.
-
-        const targetId = partnerId || profileId; // If partnerId provided, fetch their notes.
-
         const result = await db.query.notes.findMany({
-            where: eq(notes.profileId, targetId),
+            where: eq(notes.userId, targetId),
             orderBy: [desc(notes.timestamp)],
         });
 
         return Response.json(result);
     } catch (error) {
+        console.error('GET notes error:', error);
         return Response.json({ error: 'Failed to fetch notes' }, { status: 500 });
     }
 }
@@ -36,10 +33,11 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
     try {
         const body = await request.json();
-        console.log('[API] POST /notes received:', JSON.stringify(body, null, 2));
+        // Body has profileId. Map to userId.
+        const userId = body.profileId || body.userId;
 
         const [newNote] = await db.insert(notes).values({
-            profileId: body.profileId,
+            userId: userId,
             type: body.type,
             content: body.content,
             color: body.color,
@@ -51,7 +49,7 @@ export async function POST(request: Request) {
 
         return Response.json(newNote);
     } catch (error) {
-        console.error(error);
+        console.error('POST note error:', error);
         return Response.json({ error: 'Failed to save note' }, { status: 500 });
     }
 }
@@ -71,5 +69,19 @@ export async function PATCH(request: Request) {
         return Response.json(updated);
     } catch (error) {
         return Response.json({ error: 'Update failed' }, { status: 500 });
+    }
+}
+
+export async function DELETE(request: Request) {
+    const url = new URL(request.url);
+    const id = url.searchParams.get('id');
+
+    if (!id) return Response.json({ error: 'ID required' }, { status: 400 });
+
+    try {
+        await db.delete(notes).where(eq(notes.id, id));
+        return Response.json({ success: true });
+    } catch (error) {
+        return Response.json({ error: 'Delete failed' }, { status: 500 });
     }
 }
