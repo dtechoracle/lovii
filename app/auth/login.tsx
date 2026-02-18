@@ -2,12 +2,16 @@ import { AuthService } from '@/services/auth';
 import { StorageService } from '@/services/storage';
 import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
+import { Image } from 'expo-image';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Link, useRouter } from 'expo-router';
 import React, { useState } from 'react';
-import { ActivityIndicator, Alert, Image, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, KeyboardAvoidingView, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function LoginScreen() {
     const router = useRouter();
+    const insets = useSafeAreaInsets();
     const [code, setCode] = useState('');
     const [password, setPassword] = useState('');
     const [loading, setLoading] = useState(false);
@@ -19,9 +23,7 @@ export default function LoginScreen() {
         }
 
         setLoading(true);
-        // Normalize code format (uppercase, maybe remove spaces?)
         const formattedCode = code.toUpperCase().trim();
-
         const result = await AuthService.login(formattedCode, password);
 
         if (result.success && result.user) {
@@ -35,73 +37,93 @@ export default function LoginScreen() {
 
     return (
         <View style={styles.container}>
+            {/* Full Screen Image Background */}
             <Image
-                source={{ uri: 'https://images.unsplash.com/photo-1518199266791-5375a83190b7?q=80&w=2670&auto=format&fit=crop' }}
-                style={StyleSheet.absoluteFillObject}
-                resizeMode="cover"
+                source={{ uri: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=1964&auto=format&fit=crop' }}
+                style={StyleSheet.absoluteFill}
+                contentFit="cover"
+                transition={500}
             />
-            <BlurView intensity={80} tint="dark" style={StyleSheet.absoluteFillObject} />
+
+            {/* Gradient Overlay (Fade to Black/Dark at bottom) */}
+            <LinearGradient
+                colors={['transparent', 'rgba(0,0,0,0.4)', '#000000']}
+                locations={[0, 0.4, 1]}
+                style={StyleSheet.absoluteFill}
+            />
 
             <KeyboardAvoidingView
                 behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
                 style={styles.keyboardView}
             >
-                <ScrollView contentContainerStyle={styles.content}>
-                    <View style={styles.header}>
-                        <View style={styles.iconContainer}>
-                            <Ionicons name="key-outline" size={40} color="#FF6B6B" />
-                        </View>
+                <View style={[styles.content, { paddingBottom: insets.bottom + 20 }]}>
+
+                    {/* Top Section (Spacer) */}
+                    <View style={{ flex: 1 }} />
+
+                    {/* Bottom Content */}
+                    <View style={styles.formContainer}>
                         <Text style={styles.title}>Welcome Back</Text>
-                        <Text style={styles.subtitle}>Enter your Lovii Code to continue</Text>
-                    </View>
+                        <Text style={styles.subtitle}>Sign in to continue your journey</Text>
 
-                    <View style={styles.form}>
-                        <View style={styles.inputGroup}>
-                            <Text style={styles.label}>Lovii Code</Text>
-                            <TextInput
-                                style={[styles.input, { letterSpacing: 2, fontWeight: '600' }]}
-                                placeholder="LOVII-XXXX"
-                                placeholderTextColor="rgba(255,255,255,0.4)"
-                                value={code}
-                                onChangeText={setCode}
-                                autoCapitalize="characters"
-                            />
-                        </View>
+                        {/* Glassmorphism Inputs */}
+                        <BlurView intensity={30} tint="dark" style={styles.glassContainer}>
+                            <View style={styles.inputWrapper}>
+                                <Ionicons name="key-outline" size={20} color="rgba(255,255,255,0.6)" style={styles.inputIcon} />
+                                <TextInput
+                                    style={styles.input}
+                                    placeholder="Your Code"
+                                    placeholderTextColor="rgba(255,255,255,0.4)"
+                                    value={code}
+                                    onChangeText={setCode}
+                                    autoCapitalize="characters"
+                                    maxLength={10}
+                                />
+                            </View>
+                            <View style={styles.divider} />
+                            <View style={styles.inputWrapper}>
+                                <Ionicons name="lock-closed-outline" size={20} color="rgba(255,255,255,0.6)" style={styles.inputIcon} />
+                                <TextInput
+                                    style={styles.input}
+                                    placeholder="Password"
+                                    placeholderTextColor="rgba(255,255,255,0.4)"
+                                    value={password}
+                                    onChangeText={setPassword}
+                                    secureTextEntry
+                                />
+                            </View>
+                        </BlurView>
 
-                        <View style={styles.inputGroup}>
-                            <Text style={styles.label}>Password</Text>
-                            <TextInput
-                                style={styles.input}
-                                placeholder="••••••••"
-                                placeholderTextColor="rgba(255,255,255,0.4)"
-                                value={password}
-                                onChangeText={setPassword}
-                                secureTextEntry
-                            />
-                        </View>
-
+                        {/* Main Action Button */}
                         <TouchableOpacity
-                            style={styles.button}
                             onPress={handleLogin}
                             disabled={loading}
+                            activeOpacity={0.8}
+                            style={styles.buttonContainer}
                         >
-                            {loading ? (
-                                <ActivityIndicator color="#FFF" />
-                            ) : (
-                                <Text style={styles.buttonText}>Sign In</Text>
-                            )}
+                            <LinearGradient
+                                colors={['#FFFFFF', '#E0E0E0']}
+                                style={styles.button}
+                            >
+                                {loading ? (
+                                    <ActivityIndicator color="#000" />
+                                ) : (
+                                    <Text style={styles.buttonText}>Sign In</Text>
+                                )}
+                            </LinearGradient>
                         </TouchableOpacity>
 
+                        {/* Footer Link */}
                         <View style={styles.footer}>
-                            <Text style={styles.footerText}>New to Lovii? </Text>
+                            <Text style={styles.footerText}>Don't have an account? </Text>
                             <Link href="/auth/register" asChild>
                                 <TouchableOpacity>
-                                    <Text style={styles.linkText}>Create Account</Text>
+                                    <Text style={styles.linkText}>Register</Text>
                                 </TouchableOpacity>
                             </Link>
                         </View>
                     </View>
-                </ScrollView>
+                </View>
             </KeyboardAvoidingView>
         </View>
     );
@@ -116,76 +138,71 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     content: {
-        flexGrow: 1,
-        justifyContent: 'center',
-        padding: 24,
+        flex: 1,
+        justifyContent: 'flex-end',
+        paddingHorizontal: 24,
     },
-    header: {
-        marginBottom: 40,
-        alignItems: 'center',
-    },
-    iconContainer: {
-        width: 80,
-        height: 80,
-        borderRadius: 40,
-        backgroundColor: 'rgba(255,255,255,0.1)',
-        justifyContent: 'center',
-        alignItems: 'center',
+    formContainer: {
         marginBottom: 20,
-        borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.2)',
     },
     title: {
-        fontSize: 32,
-        fontWeight: 'bold',
+        fontSize: 42,
+        fontWeight: '800',
         color: '#FFF',
         marginBottom: 8,
+        letterSpacing: -1,
     },
     subtitle: {
         fontSize: 16,
         color: 'rgba(255,255,255,0.7)',
-        textAlign: 'center',
+        marginBottom: 32,
     },
-    form: {
-        width: '100%',
-    },
-    inputGroup: {
-        marginBottom: 20,
-    },
-    label: {
-        color: 'rgba(255,255,255,0.8)',
-        fontSize: 14,
-        marginBottom: 8,
-        marginLeft: 4,
-        fontWeight: '600',
-    },
-    input: {
-        height: 56,
-        backgroundColor: 'rgba(255,255,255,0.1)',
-        borderRadius: 16,
-        paddingHorizontal: 16,
-        fontSize: 16,
-        color: '#FFF',
+    glassContainer: {
+        borderRadius: 24,
+        overflow: 'hidden',
         borderWidth: 1,
         borderColor: 'rgba(255,255,255,0.1)',
+        backgroundColor: 'rgba(0,0,0,0.2)',
+        marginBottom: 24,
+    },
+    inputWrapper: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 20,
+        height: 64,
+    },
+    inputIcon: {
+        marginRight: 12,
+    },
+    input: {
+        flex: 1,
+        fontSize: 17,
+        color: '#FFF',
+        fontWeight: '500',
+        height: '100%',
+    },
+    divider: {
+        height: 1,
+        backgroundColor: 'rgba(255,255,255,0.1)',
+        marginLeft: 52,
+    },
+    buttonContainer: {
+        shadowColor: "#FFF",
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.1,
+        shadowRadius: 12,
+        elevation: 5,
     },
     button: {
-        height: 56,
-        backgroundColor: '#FF6B6B',
-        borderRadius: 16,
+        height: 64,
+        borderRadius: 32,
         justifyContent: 'center',
         alignItems: 'center',
-        marginTop: 16,
-        shadowColor: "#FF6B6B",
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.3,
-        shadowRadius: 8,
-        elevation: 4,
     },
     buttonText: {
         fontSize: 18,
-        fontWeight: '600',
-        color: '#FFF',
+        fontWeight: '700',
+        color: '#000',
     },
     footer: {
         flexDirection: 'row',
@@ -193,12 +210,12 @@ const styles = StyleSheet.create({
         marginTop: 24,
     },
     footerText: {
-        color: 'rgba(255,255,255,0.6)',
+        color: 'rgba(255,255,255,0.5)',
         fontSize: 14,
     },
     linkText: {
-        color: '#FF6B6B',
+        color: '#FFF',
         fontSize: 14,
-        fontWeight: '600',
+        fontWeight: '700',
     },
 });

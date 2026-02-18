@@ -29,6 +29,11 @@ export interface Note {
     userId?: string; // Who created the note
     reactions?: Reaction[];
     comments?: Comment[];
+    // Font styling
+    fontFamily?: string;
+    fontWeight?: string;
+    fontStyle?: string;
+    textDecorationLine?: string;
 }
 
 export interface UserProfile {

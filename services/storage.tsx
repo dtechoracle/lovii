@@ -20,6 +20,7 @@ const KEYS = {
     THEME_MODE: 'lovii_theme_mode',
     LOCAL_NOTES: 'lovii_local_notes',
     LOCAL_TASKS: 'lovii_local_tasks',
+    PUSH_TOKEN: 'lovii_push_token',
 };
 
 const WIDGET_NAME = 'LoviiWidget';
@@ -134,6 +135,27 @@ export const StorageService = {
         }
     },
 
+    async savePushToken(token: string): Promise<void> {
+        try {
+            const currentToken = await AsyncStorage.getItem(KEYS.PUSH_TOKEN);
+            if (currentToken === token) return; // No change
+
+            await AsyncStorage.setItem(KEYS.PUSH_TOKEN, token);
+            const userId = await AsyncStorage.getItem(KEYS.USER_ID);
+
+            if (userId) {
+                console.log('[StorageService] Syncing push token to backend...');
+                fetch(`${API_URL}/auth/pushtoken`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ userId, token }),
+                }).catch(e => console.log('Push token sync failed', e));
+            }
+        } catch (e) {
+            console.error('Error saving push token', e);
+        }
+    },
+
     // Called by LOGIN/REGISTER to set initial state
     async setSession(user: any): Promise<void> {
         const profile: UserProfile = {
@@ -144,6 +166,12 @@ export const StorageService = {
             gender: 'female', // Default
         };
         await this.saveLocalProfile(profile);
+
+        // Sync token if we have one waiting
+        const token = await AsyncStorage.getItem(KEYS.PUSH_TOKEN);
+        if (token) {
+            this.savePushToken(token); // Will trigger sync since UserID is now set
+        }
     },
 
     // Legacy method - mostly unused now as Auth handles creation
@@ -189,6 +217,7 @@ export const StorageService = {
                     if (p) {
                         p.connectedPartnerId = data.partnerId;
                         p.partnerName = data.partnerName;
+                        p.partnerCode = data.partnerCode;
                         await this.saveLocalProfile(p);
                     }
                     return true;
@@ -364,6 +393,10 @@ export const StorageService = {
                                 timestamp={latest.timestamp}
                                 color={latest.color}
                                 hasPartnerNote={true}
+                                fontFamily={latest.fontFamily}
+                                fontWeight={latest.fontWeight}
+                                fontStyle={latest.fontStyle}
+                                textDecorationLine={latest.textDecorationLine}
                             />
                         ),
                         widgetNotFound: () => { }
@@ -424,8 +457,43 @@ export const StorageService = {
     },
 
     async updateWidget() {
-        // Same widget update logic...
-        const pId = await AsyncStorage.getItem(KEYS.PARTNER_ID);
-        // ... implementation same as before but fetching notes
+        try {
+            const notes = await this.getPartnerNotes();
+            if (notes.length > 0) {
+                const latest = notes[0];
+                requestWidgetUpdate({
+                    widgetName: WIDGET_NAME,
+                    renderWidget: () => (
+                        <AndroidWidget
+                            content={latest.content}
+                            type={latest.type}
+                            timestamp={latest.timestamp}
+                            color={latest.color}
+                            hasPartnerNote={true}
+                            fontFamily={latest.fontFamily}
+                            fontWeight={latest.fontWeight}
+                            fontStyle={latest.fontStyle}
+                            textDecorationLine={latest.textDecorationLine}
+                        />
+                    ),
+                    widgetNotFound: () => { }
+                });
+            } else {
+                requestWidgetUpdate({
+                    widgetName: WIDGET_NAME,
+                    renderWidget: () => (
+                        <AndroidWidget
+                            content=""
+                            type="text"
+                            timestamp={Date.now()}
+                            hasPartnerNote={false}
+                        />
+                    ),
+                    widgetNotFound: () => { }
+                });
+            }
+        } catch (e) {
+            console.error('updateWidget failed', e);
+        }
     }
 };

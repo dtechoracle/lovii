@@ -1,10 +1,10 @@
 {
   "expo": {
-    "name": "lovii",
+    "name": "Lovii",
     "slug": "lovii",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
+    "icon": "./assets/images/lovii-logo.png",
     "scheme": "lovii",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
@@ -20,9 +20,9 @@
     "android": {
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/images/android-icon-foreground.png",
-        "backgroundImage": "./assets/images/android-icon-background.png",
-        "monochromeImage": "./assets/images/android-icon-monochrome.png"
+        "foregroundImage": "./assets/images/lovii-logo.png",
+        "backgroundImage": "./assets/images/lovii-logo.png",
+        "monochromeImage": "./assets/images/lovii-logo.png"
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
@@ -31,14 +31,14 @@
     "web": {
       "output": "server",
       "bundler": "metro",
-      "favicon": "./assets/images/favicon.png"
+      "favicon": "./assets/images/lovii-logo.png"
     },
     "plugins": [
       "expo-router",
       [
         "expo-splash-screen",
         {
-          "image": "./assets/images/splash-icon.png",
+          "image": "./assets/images/lovii-logo.png",
           "imageWidth": 200,
           "resizeMode": "contain",
           "backgroundColor": "#ffffff",
@@ -57,7 +57,7 @@
               "minWidth": 320,
               "minHeight": 120,
               "description": "See your partner's latest note",
-              "previewImage": "./assets/images/widget-preview.png"
+              "previewImage": "./assets/images/widget-preview.jpg"
             }
           ]
         }
@@ -69,7 +69,7 @@
     },
     "extra": {
       "router": {},
-      "apiUrl": "https://lovii1.vercel.app/api",
+      "apiUrl": "https://lovii-backend.onrender.com/api",
       "eas": {
         "projectId": "78bbaad6-861d-42b6-bf92-a44827c93477"
       }

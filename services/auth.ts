@@ -48,5 +48,11 @@ export const AuthService = {
         } catch (error: any) {
             return { success: false, error: error.message };
         }
+    },
+
+    async logout(): Promise<void> {
+        // Since we are using stateless JWT/Session on client, logging out is mostly client-side.
+        // If there was a server-side session to invalidate, we'd call it here.
+        return Promise.resolve();
     }
 };

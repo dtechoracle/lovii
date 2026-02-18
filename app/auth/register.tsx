@@ -2,12 +2,16 @@ import { AuthService } from '@/services/auth';
 import { StorageService } from '@/services/storage';
 import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
+import { Image } from 'expo-image';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Link, useRouter } from 'expo-router';
 import React, { useState } from 'react';
-import { ActivityIndicator, Alert, Image, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, KeyboardAvoidingView, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function RegisterScreen() {
     const router = useRouter();
+    const insets = useSafeAreaInsets();
     const [name, setName] = useState('');
     const [password, setPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
@@ -28,10 +32,7 @@ export default function RegisterScreen() {
         const result = await AuthService.register(name, password);
 
         if (result.success && result.user) {
-            // Save session
             await StorageService.setSession(result.user);
-
-            // Navigate to Main App
             router.replace('/(tabs)');
         } else {
             Alert.alert('Registration Failed', result.error || 'Unknown error');
@@ -41,72 +42,93 @@ export default function RegisterScreen() {
 
     return (
         <View style={styles.container}>
+            {/* Full Screen Image Background */}
             <Image
-                source={{ uri: 'https://images.unsplash.com/photo-1516589178581-6cd7833ae3b2?q=80&w=2544&auto=format&fit=crop' }}
-                style={StyleSheet.absoluteFillObject}
-                resizeMode="cover"
+                source={{ uri: 'https://images.unsplash.com/photo-1620641788421-7a1c342ea42e?q=80&w=1974&auto=format&fit=crop' }}
+                style={StyleSheet.absoluteFill}
+                contentFit="cover"
+                transition={500}
             />
-            <BlurView intensity={80} tint="dark" style={StyleSheet.absoluteFillObject} />
+
+            {/* Gradient Overlay */}
+            <LinearGradient
+                colors={['transparent', 'rgba(0,0,0,0.4)', '#000000']}
+                locations={[0, 0.4, 1]}
+                style={StyleSheet.absoluteFill}
+            />
 
             <KeyboardAvoidingView
                 behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
                 style={styles.keyboardView}
             >
-                <ScrollView contentContainerStyle={styles.content}>
-                    <View style={styles.header}>
-                        <View style={styles.iconContainer}>
-                            <Ionicons name="heart" size={40} color="#FF6B6B" />
-                        </View>
-                        <Text style={styles.title}>Welcome back,</Text>
-                        <Text style={styles.subtitle}>Create your secure couple's account</Text>
-                    </View>
+                <View style={[styles.content, { paddingBottom: insets.bottom + 20 }]}>
 
-                    <View style={styles.form}>
-                        <View style={styles.inputGroup}>
-                            <TextInput
-                                style={styles.input}
-                                placeholder="Display Name"
-                                placeholderTextColor="rgba(255,255,255,0.6)"
-                                value={name}
-                                onChangeText={setName}
-                                autoCapitalize="words"
-                            />
-                        </View>
+                    {/* Spacer */}
+                    <View style={{ flex: 1 }} />
 
-                        <View style={styles.inputGroup}>
-                            <TextInput
-                                style={styles.input}
-                                placeholder="Password"
-                                placeholderTextColor="rgba(255,255,255,0.6)"
-                                value={password}
-                                onChangeText={setPassword}
-                                secureTextEntry
-                            />
-                        </View>
+                    <View style={styles.formContainer}>
+                        <Text style={styles.title}>Join Lovii</Text>
+                        <Text style={styles.subtitle}>Create your secure couple's space</Text>
 
-                        <View style={styles.inputGroup}>
-                            <TextInput
-                                style={styles.input}
-                                placeholder="Confirm Password"
-                                placeholderTextColor="rgba(255,255,255,0.6)"
-                                value={confirmPassword}
-                                onChangeText={setConfirmPassword}
-                                secureTextEntry
-                            />
-                        </View>
+                        {/* Glassmorphism Inputs */}
+                        <BlurView intensity={30} tint="dark" style={styles.glassContainer}>
+                            <View style={styles.inputWrapper}>
+                                <Ionicons name="person-outline" size={20} color="rgba(255,255,255,0.6)" style={styles.inputIcon} />
+                                <TextInput
+                                    style={styles.input}
+                                    placeholder="Nickname"
+                                    placeholderTextColor="rgba(255,255,255,0.4)"
+                                    value={name}
+                                    onChangeText={setName}
+                                    autoCapitalize="words"
+                                />
+                            </View>
+                            <View style={styles.divider} />
+                            <View style={styles.inputWrapper}>
+                                <Ionicons name="lock-closed-outline" size={20} color="rgba(255,255,255,0.6)" style={styles.inputIcon} />
+                                <TextInput
+                                    style={styles.input}
+                                    placeholder="Password"
+                                    placeholderTextColor="rgba(255,255,255,0.4)"
+                                    value={password}
+                                    onChangeText={setPassword}
+                                    secureTextEntry
+                                />
+                            </View>
+                            <View style={styles.divider} />
+                            <View style={styles.inputWrapper}>
+                                <Ionicons name="checkmark-circle-outline" size={20} color="rgba(255,255,255,0.6)" style={styles.inputIcon} />
+                                <TextInput
+                                    style={styles.input}
+                                    placeholder="Confirm Password"
+                                    placeholderTextColor="rgba(255,255,255,0.4)"
+                                    value={confirmPassword}
+                                    onChangeText={setConfirmPassword}
+                                    secureTextEntry
+                                />
+                            </View>
+                        </BlurView>
 
+                        {/* Main Action Button */}
                         <TouchableOpacity
-                            style={styles.button}
                             onPress={handleRegister}
                             disabled={loading}
+                            activeOpacity={0.8}
+                            style={styles.buttonContainer}
                         >
-                            {loading ? (
-                                <ActivityIndicator color="#FFF" />
-                            ) : (
-                                <Text style={styles.buttonText}>Get Started</Text>
-                            )}
+                            <LinearGradient
+                                colors={['#FFFFFF', '#E0E0E0']}
+                                style={styles.button}
+                            >
+                                {loading ? (
+                                    <ActivityIndicator color="#000" />
+                                ) : (
+                                    <Text style={styles.buttonText}>Get Started</Text>
+                                )}
+                            </LinearGradient>
                         </TouchableOpacity>
 
+                        {/* Footer Link */}
                         <View style={styles.footer}>
                             <Text style={styles.footerText}>Already have an account? </Text>
                             <Link href="/auth/login" asChild>
@@ -116,7 +138,7 @@ export default function RegisterScreen() {
                             </Link>
                         </View>
                     </View>
-                </ScrollView>
+                </View>
             </KeyboardAvoidingView>
         </View>
     );
@@ -131,69 +153,71 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     content: {
-        flexGrow: 1,
-        justifyContent: 'center',
-        padding: 24,
+        flex: 1,
+        justifyContent: 'flex-end',
+        paddingHorizontal: 24,
     },
-    header: {
-        marginBottom: 40,
-        alignItems: 'center',
-    },
-    iconContainer: {
-        width: 80,
-        height: 80,
-        borderRadius: 40,
-        backgroundColor: 'rgba(255,255,255,0.1)',
-        justifyContent: 'center',
-        alignItems: 'center',
+    formContainer: {
         marginBottom: 20,
-        borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.2)',
     },
     title: {
-        fontSize: 32,
-        fontWeight: 'bold',
+        fontSize: 42,
+        fontWeight: '800',
         color: '#FFF',
         marginBottom: 8,
+        letterSpacing: -1,
     },
     subtitle: {
         fontSize: 16,
         color: 'rgba(255,255,255,0.7)',
-        textAlign: 'center',
+        marginBottom: 32,
     },
-    form: {
-        width: '100%',
-    },
-    inputGroup: {
-        marginBottom: 16,
-    },
-    input: {
-        height: 56,
-        backgroundColor: 'rgba(255,255,255,0.1)',
-        borderRadius: 16,
-        paddingHorizontal: 16,
-        fontSize: 16,
-        color: '#FFF',
+    glassContainer: {
+        borderRadius: 24,
+        overflow: 'hidden',
         borderWidth: 1,
         borderColor: 'rgba(255,255,255,0.1)',
+        backgroundColor: 'rgba(0,0,0,0.2)',
+        marginBottom: 24,
+    },
+    inputWrapper: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 20,
+        height: 64,
+    },
+    inputIcon: {
+        marginRight: 12,
+    },
+    input: {
+        flex: 1,
+        fontSize: 17,
+        color: '#FFF',
+        fontWeight: '500',
+        height: '100%',
+    },
+    divider: {
+        height: 1,
+        backgroundColor: 'rgba(255,255,255,0.1)',
+        marginLeft: 52,
+    },
+    buttonContainer: {
+        shadowColor: "#FFF",
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.1,
+        shadowRadius: 12,
+        elevation: 5,
     },
     button: {
-        height: 56,
-        backgroundColor: '#FF6B6B',
-        borderRadius: 16,
+        height: 64,
+        borderRadius: 32,
         justifyContent: 'center',
         alignItems: 'center',
-        marginTop: 8,
-        shadowColor: "#FF6B6B",
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.3,
-        shadowRadius: 8,
-        elevation: 4,
     },
     buttonText: {
         fontSize: 18,
-        fontWeight: '600',
-        color: '#FFF',
+        fontWeight: '700',
+        color: '#000',
     },
     footer: {
         flexDirection: 'row',
@@ -201,12 +225,12 @@ const styles = StyleSheet.create({
         marginTop: 24,
     },
     footerText: {
-        color: 'rgba(255,255,255,0.6)',
+        color: 'rgba(255,255,255,0.5)',
         fontSize: 14,
     },
     linkText: {
-        color: '#FF6B6B',
+        color: '#FFF',
         fontSize: 14,
-        fontWeight: '600',
+        fontWeight: '700',
     },
 });

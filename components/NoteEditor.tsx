@@ -8,13 +8,25 @@ import ScreenHeader from './ScreenHeader';
 import OutlinedCard from './ui/OutlinedCard';
 
 interface NoteEditorProps {
-    onSend: (content: string, type: 'text' | 'drawing', color: string, sendToWidget?: boolean) => void;
+    onSend: (
+        content: string,
+        type: 'text' | 'drawing',
+        color: string,
+        sendToWidget?: boolean,
+        fontStyles?: {
+            fontFamily?: string;
+            fontWeight?: string;
+            fontStyle?: string;
+            textDecorationLine?: string;
+        }
+    ) => void;
     onCancel: () => void;
     isSending?: boolean;
 }
 
 const PALETTE = [
-    '#1C1C1E', // Black (Soft)
+    '#1C1C1E', // Black
+    '#FFFFFF', // White
     '#FF3B30', // Red
     '#FF9500', // Orange
     '#FFCC00', // Yellow
@@ -58,7 +70,10 @@ export default function NoteEditor({ onSend, onCancel, isSending = false }: Note
     const [mode, setMode] = useState<'text' | 'drawing'>('drawing');
     const [text, setText] = useState('');
     const [paths, setPaths] = useState<PathData[]>([]);
-    const [selectedColor, setSelectedColor] = useState(PALETTE[0]);
+
+    // Initialize color with theme text color so it's visible by default
+    const [selectedColor, setSelectedColor] = useState(theme.text);
+
     const [selectedFont, setSelectedFont] = useState<string | undefined>(FONTS[0].fallback);
     const [isBold, setIsBold] = useState(false);
     const [isItalic, setIsItalic] = useState(false);
@@ -111,7 +126,12 @@ export default function NoteEditor({ onSend, onCancel, isSending = false }: Note
 
     const executeSend = async (sendToWidget: boolean) => {
         if (mode === 'text') {
-            onSend(text, 'text', selectedColor, sendToWidget);
+            onSend(text, 'text', selectedColor, sendToWidget, {
+                fontFamily: selectedFont,
+                fontWeight: isBold ? 'bold' : 'normal',
+                fontStyle: isItalic ? 'italic' : 'normal',
+                textDecorationLine: isUnderline ? 'underline' : 'none',
+            });
         } else {
             try {
                 let imageBase64 = null;

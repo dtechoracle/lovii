@@ -10,7 +10,7 @@
                 "buildType": "apk"
             },
             "env": {
-                "EXPO_PUBLIC_API_URL": "https://lovii1.vercel.app/api"
+                "EXPO_PUBLIC_API_URL": "https://lovii-backend.onrender.com/api"
             }
         },
         "preview": {
@@ -19,7 +19,7 @@
                 "buildType": "apk"
             },
             "env": {
-                "EXPO_PUBLIC_API_URL": "https://lovii1.vercel.app/api"
+                "EXPO_PUBLIC_API_URL": "https://lovii-backend.onrender.com/api"
             }
         },
         "production": {
@@ -27,7 +27,7 @@
                 "buildType": "app-bundle"
             },
             "env": {
-                "EXPO_PUBLIC_API_URL": "https://lovii1.vercel.app/api"
+                "EXPO_PUBLIC_API_URL": "https://lovii-backend.onrender.com/api"
             }
         }
     },

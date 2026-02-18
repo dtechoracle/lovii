@@ -8,7 +8,18 @@ export default function EditorScreen() {
     const router = useRouter();
     const [isSending, setIsSending] = useState(false);
 
-    const handleSend = async (content: string, type: 'text' | 'drawing', color: string, sendToWidget: boolean = false) => {
+    const handleSend = async (
+        content: string,
+        type: 'text' | 'drawing',
+        color: string,
+        sendToWidget: boolean = false,
+        fontStyles?: {
+            fontFamily?: string;
+            fontWeight?: string;
+            fontStyle?: string;
+            textDecorationLine?: string;
+        }
+    ) => {
         if (isSending) return;
 
         setIsSending(true);
@@ -20,6 +31,8 @@ export default function EditorScreen() {
                 content,
                 timestamp: Date.now(),
                 color,
+                // Add font styles if present
+                ...(fontStyles || {}),
             };
 
             if (sendToWidget) {

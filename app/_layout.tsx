@@ -1,5 +1,6 @@
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { ThemeProvider } from '@/context/ThemeContext';
+import { NotificationService } from '@/services/notification';
 import { StorageService } from '@/services/storage';
 import { DarkTheme, DefaultTheme, ThemeProvider as NavThemeProvider } from '@react-navigation/native';
 import { Stack } from 'expo-router';
@@ -18,6 +19,16 @@ export default function RootLayout() {
     // Force immediate widget update on app start to fix "preview image" issue
     StorageService.updateWidget();
 
+    // Setup Notifications
+    const cleanupNotifications = NotificationService.setupNotificationListeners();
+
+    // Get and save Token
+    NotificationService.registerForPushNotificationsAsync().then(token => {
+      if (token) {
+        StorageService.savePushToken(token);
+      }
+    });
+
     const subscription = StorageService.subscribeToPartnerNotes((note) => {
       console.log('[RootLayout] New partner note received:', note.type, note.timestamp);
     });
@@ -25,6 +36,7 @@ export default function RootLayout() {
     return () => {
       console.log('[RootLayout] Cleaning up partner notes subscription');
       subscription.unsubscribe();
+      cleanupNotifications();
     };
   }, []);
 

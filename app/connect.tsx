@@ -4,6 +4,7 @@ import { ThemedText } from '@/components/themed-text';
 import ThemePickerModal from '@/components/ThemePickerModal';
 import OutlinedCard from '@/components/ui/OutlinedCard';
 import { useTheme } from '@/context/ThemeContext';
+import { AuthService } from '@/services/auth';
 import { StorageService, UserProfile } from '@/services/storage';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
@@ -145,7 +146,7 @@ export default function ConnectScreen() {
                     options: [{
                         text: 'OK',
                         onPress: () => {
-                            setCode(''); // Clear the code input after successful connection
+                            // Keep the code visible
                         },
                         style: 'cancel'
                     }]
@@ -183,18 +184,41 @@ export default function ConnectScreen() {
         }
     };
 
+    const handleLogout = async () => {
+        Alert.alert("Log Out?", "You will return to the login screen.", [
+            { text: "Cancel", style: "cancel" },
+            {
+                text: "Log Out",
+                style: "destructive",
+                onPress: async () => {
+                    await AuthService.logout();
+                    router.replace('/auth/login');
+                }
+            }
+        ]);
+    };
+
     const handleReset = async () => {
-        Alert.alert("Reset App?", "This will clear all data.", [
+        Alert.alert("Reset App?", "This will clear all data locally. Your account still exists on the server.", [
             { text: "Cancel", style: "cancel" },
             {
                 text: "Reset",
                 style: "destructive",
                 onPress: async () => {
                     await StorageService.clearAll();
-                    router.replace('/(tabs)');
+                    router.replace('/(tabs)'); // Or login?
+                    router.replace('/auth/login');
                 }
             }
         ]);
+    };
+
+    // Helper for input styles
+    const inputStyle = {
+        backgroundColor: theme.textSecondary + '1A', // 10% opacity of text secondary
+        color: theme.text,
+        borderColor: theme.border,
+        borderWidth: 1,
     };
 
     return (
@@ -202,17 +226,17 @@ export default function ConnectScreen() {
             <ScreenHeader title="Settings" showBack />
             <ScrollView contentContainerStyle={styles.content}>
                 {/* Profile Section */}
-                <OutlinedCard style={[styles.card, { backgroundColor: theme.card }]}>
+                <OutlinedCard style={[styles.card, { backgroundColor: theme.card, borderColor: theme.border }]}>
                     <ThemedText type="subtitle" style={[styles.label, { color: theme.textSecondary }]}>Profile</ThemedText>
                     <TouchableOpacity style={styles.avatarSection} onPress={handlePickImage}>
-                        <View style={[styles.avatarContainer, { backgroundColor: theme.primary }]}>
+                        <View style={[styles.avatarContainer, { backgroundColor: theme.primary, borderColor: theme.card }]}>
                             {avatarUri ? (
                                 <Image source={{ uri: avatarUri }} style={styles.avatarImage} />
                             ) : (
                                 <Ionicons name="person" size={48} color="#FFF" />
                             )}
                         </View>
-                        <View style={styles.avatarBadge}>
+                        <View style={[styles.avatarBadge, { borderColor: theme.card }]}>
                             <Ionicons name="camera" size={16} color="#FFF" />
                         </View>
                     </TouchableOpacity>
@@ -220,7 +244,7 @@ export default function ConnectScreen() {
                 </OutlinedCard>
 
                 {/* Theme Section */}
-                <OutlinedCard style={[styles.card, { backgroundColor: theme.card }]}>
+                <OutlinedCard style={[styles.card, { backgroundColor: theme.card, borderColor: theme.border }]}>
                     <ThemedText type="subtitle" style={[styles.label, { color: theme.textSecondary }]}>Appearance</ThemedText>
                     <TouchableOpacity
                         style={[styles.themeButton, { backgroundColor: theme.primary }]}
@@ -231,38 +255,40 @@ export default function ConnectScreen() {
                     </TouchableOpacity>
                 </OutlinedCard>
 
-                <OutlinedCard style={[styles.card, { backgroundColor: theme.card }]}>
-                    <ThemedText type="subtitle" style={styles.label}>My Code</ThemedText>
-                    <TouchableOpacity style={styles.codeContainer} onPress={handleShare}>
-                        <ThemedText type="title" style={styles.code}>{myCode}</ThemedText>
-                        <Ionicons name="copy-outline" size={24} color="#4B6EFF" />
+                <OutlinedCard style={[styles.card, { backgroundColor: theme.card, borderColor: theme.border }]}>
+                    <ThemedText type="subtitle" style={[styles.label, { color: theme.textSecondary }]}>My Code</ThemedText>
+                    <TouchableOpacity
+                        style={[styles.codeContainer, { backgroundColor: theme.textSecondary + '1A' }]}
+                        onPress={handleShare}
+                    >
+                        <ThemedText type="title" style={[styles.code, { color: theme.text }]}>{myCode}</ThemedText>
+                        <Ionicons name="copy-outline" size={24} color={theme.primary} />
                     </TouchableOpacity>
-                    <ThemedText style={styles.hint}>Tap to copy & share</ThemedText>
+                    <ThemedText style={[styles.hint, { color: theme.textSecondary }]}>Tap to copy & share</ThemedText>
                 </OutlinedCard>
 
                 <View style={styles.divider}>
-                    <View style={styles.line} />
-                    <ThemedText style={styles.or}>Connection</ThemedText>
-                    <View style={styles.line} />
+                    <View style={[styles.line, { backgroundColor: theme.border }]} />
+                    <ThemedText style={[styles.or, { color: theme.textSecondary }]}>Connection</ThemedText>
+                    <View style={[styles.line, { backgroundColor: theme.border }]} />
                 </View>
 
-                <OutlinedCard style={styles.card}>
-                    <ThemedText type="subtitle" style={styles.label}>Partner Code</ThemedText>
+                <OutlinedCard style={[styles.card, { backgroundColor: theme.card, borderColor: theme.border }]}>
+                    <ThemedText type="subtitle" style={[styles.label, { color: theme.textSecondary }]}>Partner Code</ThemedText>
                     <TextInput
-                        style={styles.input}
+                        style={[styles.input, inputStyle]}
                         placeholder="Ex. LOVII-A7B2X9"
-                        placeholderTextColor="#C7C7CC"
+                        placeholderTextColor={theme.textSecondary}
                         value={code}
                         onChangeText={(t) => setCode(t.toUpperCase())}
                         maxLength={12}
                     />
 
-
-                    <ThemedText type="subtitle" style={styles.label}>Partner Name</ThemedText>
+                    <ThemedText type="subtitle" style={[styles.label, { color: theme.textSecondary }]}>Partner Name</ThemedText>
                     <TextInput
-                        style={styles.input}
+                        style={[styles.input, inputStyle]}
                         placeholder="My Love"
-                        placeholderTextColor="#C7C7CC"
+                        placeholderTextColor={theme.textSecondary}
                         value={partnerName}
                         onChangeText={setPartnerName}
                         autoCapitalize="words"
@@ -270,24 +296,24 @@ export default function ConnectScreen() {
                     />
 
                     {connectionStatus === 'connected' ? (
-                        <View style={styles.connectedBadge}>
+                        <View style={[styles.connectedBadge, { backgroundColor: '#E8F5E9' }]}>
                             <Ionicons name="checkmark-circle" size={16} color="#34C759" />
-                            <ThemedText style={styles.connectedText}>Connected to {profile?.partnerName || 'Partner'}</ThemedText>
+                            <ThemedText style={[styles.connectedText, { color: '#000' }]}>Connected to {profile?.partnerName || 'Partner'}</ThemedText>
                         </View>
                     ) : connectionStatus === 'connecting' ? (
-                        <View style={styles.notConnectedBadge}>
-                            <Ionicons name="sync" size={16} color="#007AFF" />
-                            <ThemedText style={[styles.notConnectedText, { color: '#007AFF' }]}>Connecting...</ThemedText>
+                        <View style={[styles.notConnectedBadge, { backgroundColor: theme.textSecondary + '1A' }]}>
+                            <Ionicons name="sync" size={16} color={theme.primary} />
+                            <ThemedText style={[styles.notConnectedText, { color: theme.primary }]}>Connecting...</ThemedText>
                         </View>
                     ) : (
-                        <View style={styles.notConnectedBadge}>
+                        <View style={[styles.notConnectedBadge, { backgroundColor: theme.textSecondary + '1A' }]}>
                             <Ionicons name="close-circle" size={16} color="#FF9500" />
-                            <ThemedText style={styles.notConnectedText}>Not Connected</ThemedText>
+                            <ThemedText style={[styles.notConnectedText, { color: '#FF9500' }]}>Not Connected</ThemedText>
                         </View>
                     )}
 
                     <TouchableOpacity
-                        style={[styles.button, isConnecting && styles.buttonDisabled]}
+                        style={[styles.button, isConnecting && styles.buttonDisabled, { backgroundColor: theme.primary }]}
                         onPress={handleConnect}
                         disabled={isConnecting}
                     >
@@ -298,17 +324,22 @@ export default function ConnectScreen() {
                 </OutlinedCard>
 
 
-                {/* Reset Button - Beefed Up */}
-                <TouchableOpacity style={styles.resetBtnWrapper} onPress={handleReset}>
-                    <View style={styles.resetBtn}>
-                        <Ionicons name="trash-outline" size={20} color="#FFF" style={{ marginRight: 8 }} />
-                        <ThemedText style={styles.resetText}>Reset Everything</ThemedText>
-                    </View>
-                </TouchableOpacity>
+                {/* Buttons Container */}
+                <View style={{ gap: 16, marginTop: 10 }}>
+                    {/* Logout Button */}
+                    <TouchableOpacity style={[styles.actionBtn, { borderColor: theme.border, borderWidth: 1 }]} onPress={handleLogout}>
+                        <Ionicons name="log-out-outline" size={20} color={theme.text} style={{ marginRight: 8 }} />
+                        <ThemedText style={[styles.actionBtnText, { color: theme.text }]}>Log Out</ThemedText>
+                    </TouchableOpacity>
 
+                    {/* Reset Button */}
+                    <TouchableOpacity style={[styles.actionBtn, { borderColor: '#FF3B30', borderWidth: 1 }]} onPress={handleReset}>
+                        <Ionicons name="trash-outline" size={20} color="#FF3B30" style={{ marginRight: 8 }} />
+                        <ThemedText style={[styles.actionBtnText, { color: '#FF3B30' }]}>Reset App Data</ThemedText>
+                    </TouchableOpacity>
+                </View>
 
-
-                <Text style={styles.version}>v1.0.0</Text>
+                <Text style={[styles.version, { color: theme.textSecondary }]}>v1.0.0</Text>
             </ScrollView>
 
             <CustomAlert
@@ -340,18 +371,17 @@ const styles = StyleSheet.create({
     card: {
         padding: 24,
         borderRadius: 32,
+        borderWidth: 1, // Added border for better visibility in dark mode if needed
     },
     label: {
         fontSize: 14,
         fontWeight: '600',
-        color: '#8E8E93',
         marginBottom: 8,
     },
     codeContainer: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        backgroundColor: '#F2F2F7',
         padding: 16,
         borderRadius: 20,
         marginBottom: 8,
@@ -359,12 +389,10 @@ const styles = StyleSheet.create({
     code: {
         fontSize: 24,
         fontWeight: '700',
-        color: '#1C1C1E',
         letterSpacing: 2,
     },
     hint: {
         fontSize: 13,
-        color: '#8E8E93',
         textAlign: 'center',
         marginTop: 8,
     },
@@ -377,51 +405,39 @@ const styles = StyleSheet.create({
     line: {
         flex: 1,
         height: 1,
-        backgroundColor: '#E5E5EA',
     },
     or: {
         fontSize: 14,
         fontWeight: '600',
-        color: '#8E8E93',
     },
     input: {
-        backgroundColor: '#F2F2F7',
         borderRadius: 20,
         padding: 16,
         fontSize: 16,
         fontWeight: '600',
-        color: '#1C1C1E',
         marginBottom: 20,
     },
     button: {
-        backgroundColor: '#4B6EFF', // Soft Blue
         padding: 16,
         borderRadius: 24,
         alignItems: 'center',
         marginTop: 8,
         height: 56,
         justifyContent: 'center',
-        shadowColor: "#4B6EFF",
         shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.2,
         shadowRadius: 8,
         elevation: 4,
     },
     buttonDisabled: {
-        backgroundColor: '#B0B0B0',
-        shadowOpacity: 0.1,
+        opacity: 0.6,
     },
     buttonText: {
         color: '#FFF',
         fontWeight: '600',
         fontSize: 16,
     },
-    resetBtnWrapper: {
-        marginTop: 20,
-        alignItems: 'center',
-    },
-    resetBtn: {
-        backgroundColor: '#FF3B30',
+    actionBtn: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
@@ -429,14 +445,8 @@ const styles = StyleSheet.create({
         height: 56,
         borderRadius: 28,
         width: '100%',
-        shadowColor: "#FF3B30",
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.15,
-        shadowRadius: 6,
-        elevation: 3,
     },
-    resetText: {
-        color: '#FFF',
+    actionBtnText: {
         fontWeight: '600',
         fontSize: 16,
     },
@@ -447,12 +457,10 @@ const styles = StyleSheet.create({
         marginBottom: 12,
         paddingVertical: 8,
         paddingHorizontal: 12,
-        backgroundColor: '#E8F5E9',
         borderRadius: 12,
         alignSelf: 'flex-start',
     },
     connectedText: {
-        color: '#34C759',
         fontSize: 14,
         fontWeight: '600',
     },
@@ -463,19 +471,16 @@ const styles = StyleSheet.create({
         marginBottom: 12,
         paddingVertical: 8,
         paddingHorizontal: 12,
-        backgroundColor: '#FFF3E0',
         borderRadius: 12,
         alignSelf: 'flex-start',
     },
     notConnectedText: {
-        color: '#FF9500',
         fontSize: 14,
         fontWeight: '600',
     },
     version: {
         textAlign: 'center',
         fontSize: 12,
-        color: '#8E8E93',
         marginTop: 24,
     },
     avatarSection: {
@@ -490,11 +495,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
         overflow: 'hidden',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.2,
-        shadowRadius: 8,
-        elevation: 5,
+        borderWidth: 4,
     },
     avatarImage: {
         width: '100%',
@@ -511,7 +512,6 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
         borderWidth: 3,
-        borderColor: '#FFF',
     },
     themeButton: {
         flexDirection: 'row',
@@ -521,7 +521,6 @@ const styles = StyleSheet.create({
         borderRadius: 24,
         gap: 12,
         marginTop: 8,
-        shadowColor: "#4B6EFF",
         shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.2,
         shadowRadius: 8,

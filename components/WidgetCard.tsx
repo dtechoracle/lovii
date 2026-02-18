@@ -67,7 +67,19 @@ export default function WidgetCard({ note, onPress, partnerName = 'Partner', myU
         if (note.type === 'text') {
             return (
                 <View style={styles.textContent}>
-                    <Text style={[styles.noteText, { color: note.color || '#1C1C1E' }]} numberOfLines={8}>
+                    <Text
+                        style={[
+                            styles.noteText,
+                            {
+                                color: (theme.dark && (note.color === '#1C1C1E' || !note.color)) ? '#FFFFFF' : (note.color || theme.text),
+                                fontFamily: note.fontFamily,
+                                fontWeight: (note.fontWeight as any) || 'normal',
+                                fontStyle: (note.fontStyle as any) || 'normal',
+                                textDecorationLine: (note.textDecorationLine as any) || 'none',
+                            }
+                        ]}
+                        numberOfLines={8}
+                    >
                         {note.content}
                     </Text>
                 </View>
@@ -114,7 +126,7 @@ export default function WidgetCard({ note, onPress, partnerName = 'Partner', myU
                 <View style={styles.drawingContent}>
                     <DrawingViewer
                         paths={paths}
-                        color={note.color || '#1C1C1E'}
+                        color={note.color || theme.text}
                         width={CARD_WIDTH}
                         height={CARD_HEIGHT - 100}
                     />

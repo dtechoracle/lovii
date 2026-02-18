@@ -30,6 +30,10 @@ export async function widgetTaskHandler(props: WidgetTaskHandlerProps) {
                 return;
             }
 
+            // Get partner name
+            const profile = await StorageService.getProfile();
+            const partnerName = profile?.partnerName || 'Partner';
+
             props.renderWidget(
                 <AndroidWidget
                     content={latestNote.content}
@@ -38,6 +42,7 @@ export async function widgetTaskHandler(props: WidgetTaskHandlerProps) {
                     color={latestNote.color}
                     streak={streak}
                     hasPartnerNote={true}
+                    partnerName={partnerName}
                 />
             );
         } catch (error) {

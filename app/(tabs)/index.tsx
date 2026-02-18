@@ -114,7 +114,7 @@ export default function HomeScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: theme.background }]}>
-      <StatusBar barStyle="dark-content" />
+      <StatusBar barStyle={theme.dark ? 'light-content' : 'dark-content'} />
 
       {/* Search Bar / Header */}
       <View style={styles.header}>
