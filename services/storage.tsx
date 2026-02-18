@@ -71,6 +71,7 @@ export const StorageService = {
                 partnerCode: data.code, // User Code = Partner Code
                 connectedPartnerId: data.partnerId || undefined,
                 partnerName: data.partnerName || undefined,
+                connectedPartnerCode: data.partnerCode || undefined, // Correctly Map Partner's Code
                 anniversary: data.connectedAt ? new Date(data.connectedAt).getTime() : undefined,
                 gender: (localGender as 'male' | 'female') || 'female',
                 avatarUri: data.avatar,
@@ -217,7 +218,7 @@ export const StorageService = {
                     if (p) {
                         p.connectedPartnerId = data.partnerId;
                         p.partnerName = data.partnerName;
-                        p.partnerCode = data.partnerCode;
+                        p.connectedPartnerCode = data.partnerCode;
                         await this.saveLocalProfile(p);
                     }
                     return true;

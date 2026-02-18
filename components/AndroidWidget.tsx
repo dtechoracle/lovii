@@ -47,12 +47,11 @@ export function AndroidWidget({
                 style={{
                     height: 'match_parent',
                     width: 'match_parent',
-                    backgroundColor: '#1C1C1E', // Dark background
-                    borderRadius: 24,
-                    padding: 16,
+                    backgroundColor: '#1E1E1E', // Dark background
                     flexDirection: 'column',
                     justifyContent: 'center',
-                    alignItems: 'center'
+                    alignItems: 'center',
+                    padding: 16
                 }}
             >
                 <TextWidget text="💔" style={{ fontSize: 40, marginBottom: 12 }} />
@@ -62,14 +61,14 @@ export function AndroidWidget({
                 />
                 <TextWidget
                     text="Ask your partner to send a note!"
-                    style={{ fontSize: 14, color: '#8E8E93', marginTop: 8 }}
+                    style={{ fontSize: 14, color: '#AAAAAA', marginTop: 8 }}
                 />
             </FlexWidget>
         );
     }
 
     const noteColor = color === '#FFFFFF' ? '#000000' : color;
-    const bgColor = '#FFFFFF'; // Keep widget background clean white/light
+    const bgColor = '#FFFFFF';
 
     return (
         <FlexWidget
@@ -77,7 +76,6 @@ export function AndroidWidget({
                 height: 'match_parent',
                 width: 'match_parent',
                 backgroundColor: bgColor,
-                borderRadius: 24,
                 padding: 16,
                 flexDirection: 'column',
                 justifyContent: 'space-between'
@@ -86,14 +84,14 @@ export function AndroidWidget({
             {/* Header: Lovii + Streak */}
             <FlexWidget style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', width: 'match_parent' }}>
                 <TextWidget
-                    text="Lovii" // Branding
-                    style={{ fontSize: 18, color: '#FF231F7C', fontWeight: 'bold', fontFamily: 'sans-serif-medium' }}
+                    text="Lovii"
+                    style={{ fontSize: 18, color: '#FF231F7C', fontWeight: 'bold' }}
                 />
 
                 <FlexWidget style={{
                     flexDirection: 'row',
                     alignItems: 'center',
-                    backgroundColor: '#FFF0F5', // Light pink pill
+                    backgroundColor: '#FFF0F5',
                     borderRadius: 12,
                     paddingHorizontal: 8,
                     paddingVertical: 4
@@ -112,18 +110,18 @@ export function AndroidWidget({
                     flex: 1,
                     justifyContent: 'center',
                     alignItems: 'center',
-                    paddingVertical: 12
+                    paddingVertical: 12,
+                    width: 'match_parent'
                 }}
             >
                 {type === 'text' ? (
                     <TextWidget
-                        text={content}
+                        text={content || "Empty Note"}
                         style={{
                             fontSize: 22,
                             color: noteColor as any,
                             fontWeight: (fontWeight as any) || 'bold',
                             fontStyle: (fontStyle as any) || 'normal',
-                            // textDecorationLine not supported by widget lib
                             textAlign: 'center',
                             fontFamily: (fontFamily as any) || 'sans-serif-medium'
                         }}
