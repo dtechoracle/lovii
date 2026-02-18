@@ -54,8 +54,8 @@
             {
               "name": "LoviiWidget",
               "label": "Partner Note",
-              "minWidth": 320,
-              "minHeight": 120,
+              "minWidth": "320dp",
+              "minHeight": "120dp",
               "description": "See your partner's latest note",
               "previewImage": "./assets/images/widget-preview.jpg"
             }
