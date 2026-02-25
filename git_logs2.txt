@@ -1,0 +1,15 @@
+﻿402c7c4 changed icon
+d2cc83c fixed gradle build errors, removed env
+b9b379d fixed gradle build errors
+ebb42f2 omo
+6e9217b updated vercel config again
+904d341 updated vercel config
+f80ee29 updated vercel config
+cb4971c made chnages to the backend
+a6491da fixed errors
+0885eda fixed errors
+31826c8 fixed errors
+1769076 feat: Implement initial application structure, comprehensive theming, task management, and core UI components for notes, drawings, and widgets.
+b994a4b mehn
+5d08617 Enhance EditorScreen and NoteEditor to support sending notes to a partner's widget, including improved error handling and user feedback. Update StorageService to handle partner widget status and refine note sending logic. Introduce loading state in NoteEditor to prevent multiple submissions.
+2830221 Refactor CollageScreen to support up to 9 images in a 3x3 grid layout, allowing multiple image selection and improved alert messaging. Update ConnectScreen to manage connection status and enhance error handling during partner connection. Revise NoteEditor to support cross-platform font selection with improved UI for font picker.

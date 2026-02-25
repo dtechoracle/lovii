@@ -10,11 +10,54 @@ import { Note, StorageService, UserProfile } from '@/services/storage';
 import { Ionicons } from '@expo/vector-icons';
 import { Link, useFocusEffect, useRouter } from 'expo-router';
 import React, { useCallback, useState } from 'react';
-import { Image, RefreshControl, ScrollView, StatusBar, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
+import { Alert, Image, RefreshControl, ScrollView, StatusBar, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import Svg, { Circle, G } from 'react-native-svg';
+
+const PointsRing = ({ points, max = 10 }: { points: number; max?: number }) => {
+  const size = 32;
+  const strokeWidth = 2.5;
+  const radius = (size - strokeWidth) / 2;
+  const circumference = radius * 2 * Math.PI;
+  const progress = Math.min(points / max, 1);
+  const strokeDashoffset = circumference - progress * circumference;
+
+  return (
+    <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
+      <Svg width={size} height={size}>
+        <G rotation="-90" origin={`${size / 2}, ${size / 2}`}>
+          {/* Background circle */}
+          <Circle
+            cx={size / 2}
+            cy={size / 2}
+            r={radius}
+            stroke="#E0E0E0"
+            strokeWidth={strokeWidth}
+            fill="none"
+          />
+          {/* Progress circle */}
+          {points > 0 && <Circle
+            cx={size / 2}
+            cy={size / 2}
+            r={radius}
+            stroke="#FF6B6B"
+            strokeWidth={strokeWidth}
+            fill="none"
+            strokeDasharray={circumference}
+            strokeDashoffset={strokeDashoffset}
+            strokeLinecap="round"
+          />}
+        </G>
+      </Svg>
+      <View style={{ position: 'absolute' }}>
+        <Ionicons name="diamond" size={14} color="#FF6B6B" />
+      </View>
+    </View>
+  );
+};
 
 export default function HomeScreen() {
   const router = useRouter();
-  const { theme, themePreference } = useTheme();
+  const { theme, themePreference, isDark } = useTheme();
   const [latestNote, setLatestNote] = useState<Note | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [refreshing, setRefreshing] = useState(false);
@@ -23,6 +66,9 @@ export default function HomeScreen() {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<Note[]>([]);
   const [isSearching, setIsSearching] = useState(false);
+  const [streak, setStreak] = useState(0);
+  const [streakJustBroke, setStreakJustBroke] = useState(false);
+  const [restoringStreak, setRestoringStreak] = useState(false);
 
   // 1. Load Data & Check Profile
   const loadData = async () => {
@@ -53,6 +99,33 @@ export default function HomeScreen() {
     // Get pinned notes
     const pinned = mHistory.filter(n => n.pinned);
     setPinnedNotes(pinned);
+
+    // Calculate bidirectional streak
+    const restoredDays = await StorageService.getRestoredStreakDays();
+    const toMidnight = (ts: number) => {
+      const d = new Date(ts);
+      return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+    };
+    const myDays = new Set([...mHistory.map(n => toMidnight(n.timestamp)), ...restoredDays]);
+    const partnerDaySet = new Set([...pNotes.map(n => toMidnight(n.timestamp)), ...restoredDays]);
+    const bothSentDays = Array.from(myDays).filter(d => partnerDaySet.has(d)).sort((a, b) => b - a);
+    const today = toMidnight(Date.now());
+    const oneDay = 86400000;
+
+    let currentStreak = 0;
+    if (bothSentDays.length > 0 && bothSentDays[0] >= today - oneDay) {
+      currentStreak = 1;
+      let expected = bothSentDays[0] - oneDay;
+      for (let i = 1; i < bothSentDays.length; i++) {
+        if (bothSentDays[i] === expected) { currentStreak++; expected -= oneDay; } else break;
+      }
+    }
+    setStreak(currentStreak);
+
+    // Detect if streak just broke: last mutual day was exactly yesterday
+    const lastMutual = bothSentDays[0];
+    const broke = currentStreak === 0 && lastMutual === today - oneDay;
+    setStreakJustBroke(broke);
   };
 
   // Search functionality
@@ -94,6 +167,12 @@ export default function HomeScreen() {
         return true;
       }
 
+      // Search in tasks content
+      if (note.type === 'tasks' && note.tasks) {
+        const taskMatch = note.tasks.some(t => t.text.toLowerCase().includes(searchLower));
+        if (taskMatch) return true;
+      }
+
       return false;
     }).sort((a, b) => b.timestamp - a.timestamp);
 
@@ -114,7 +193,7 @@ export default function HomeScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: theme.background }]}>
-      <StatusBar barStyle={theme.dark ? 'light-content' : 'dark-content'} />
+      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
 
       {/* Search Bar / Header */}
       <View style={styles.header}>
@@ -133,13 +212,24 @@ export default function HomeScreen() {
             </TouchableOpacity>
           )}
         </View>
+        <Link href="/pricing" asChild>
+          <TouchableOpacity style={[styles.iconButton, { backgroundColor: theme.card }]}>
+            <PointsRing points={profile?.points || 0} max={profile?.maxPoints || profile?.points || 1} />
+          </TouchableOpacity>
+        </Link>
         <Link href="/connect" asChild>
           <TouchableOpacity style={[styles.profilePic, { backgroundColor: theme.primary }]}>
-            {profile?.avatarUri ? (
-              <Image source={{ uri: profile.avatarUri }} style={styles.avatar} />
-            ) : (
-              <Ionicons name="person" size={20} color="#FFF" />
-            )}
+            <View style={{ width: 44, height: 44, borderRadius: 22, overflow: 'hidden', alignItems: 'center', justifyContent: 'center' }}>
+              {profile?.avatarUri ? (
+                <Image
+                  source={{ uri: profile.avatarUri }}
+                  style={{ width: 44, height: 44 }}
+                  resizeMode="cover"
+                />
+              ) : (
+                <Ionicons name="person" size={20} color="#FFF" />
+              )}
+            </View>
           </TouchableOpacity>
         </Link>
       </View>
@@ -183,6 +273,19 @@ export default function HomeScreen() {
                           resizeMode="cover"
                         />
                       )}
+                      {note.type === 'music' && (() => {
+                        let track = note.musicTrack;
+                        if (!track) { try { track = JSON.parse(note.content); } catch (e) { } }
+                        if (track) {
+                          return (
+                            <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+                              <Image source={{ uri: track.coverUrl }} style={{ width: '100%', height: '100%', borderRadius: 20, position: 'absolute', opacity: 0.4 }} resizeMode="cover" />
+                              <Ionicons name="musical-notes" size={32} color={theme.primary} />
+                            </View>
+                          );
+                        }
+                        return null;
+                      })()}
                       {note.type === 'drawing' && (() => {
                         let preview: string | null = null;
                         try {
@@ -222,6 +325,33 @@ export default function HomeScreen() {
               Tap the + below to create your first note.
             </ThemedText>}
 
+            {/* Streak Restore Banner — shows when streak just broke */}
+            {streakJustBroke && (
+              <TouchableOpacity
+                activeOpacity={0.85}
+                disabled={restoringStreak}
+                onPress={async () => {
+                  setRestoringStreak(true);
+                  const result = await StorageService.restoreStreak();
+                  setRestoringStreak(false);
+                  if (result.success) {
+                    setStreakJustBroke(false);
+                    await loadData();
+                    Alert.alert('🔥 Streak Restored!', 'Your streak is back! Keep it going together.');
+                  } else {
+                    Alert.alert('Cannot Restore', result.error || 'Failed to restore streak.');
+                  }
+                }}
+                style={[styles.streakBanner, { backgroundColor: '#FF6B00' }]}
+              >
+                <Ionicons name="flame" size={20} color="#FFF" />
+                <Text style={styles.streakBannerText}>
+                  {restoringStreak ? 'Restoring...' : 'Streak broke! Restore for 5 💎'}
+                </Text>
+                <Ionicons name="chevron-forward" size={16} color="#FFF" />
+              </TouchableOpacity>
+            )}
+
             {/* Hero Card - Widget */}
             <WidgetCard
               note={latestNote}
@@ -240,7 +370,7 @@ export default function HomeScreen() {
                 </View>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.horizontalScroll}>
                   {pinnedNotes.map(note => (
-                    <TouchableOpacity key={note.id} activeOpacity={0.8} style={styles.miniCardWrapper}>
+                    <TouchableOpacity key={note.id} activeOpacity={0.8} style={styles.miniCardWrapper} onPress={() => router.push('/history')}>
                       <OutlinedCard style={[styles.miniCard, { backgroundColor: theme.card }]}>
                         {note.type === 'text' && (
                           <ThemedText style={[styles.miniCardText, { color: theme.text }]} numberOfLines={3}>
@@ -254,6 +384,19 @@ export default function HomeScreen() {
                             resizeMode="cover"
                           />
                         )}
+                        {note.type === 'music' && (() => {
+                          let track = note.musicTrack;
+                          if (!track) { try { track = JSON.parse(note.content); } catch (e) { } }
+                          if (track) {
+                            return (
+                              <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+                                <Image source={{ uri: track.coverUrl }} style={{ width: '100%', height: '100%', borderRadius: 20, position: 'absolute', opacity: 0.4 }} resizeMode="cover" />
+                                <Ionicons name="musical-notes" size={32} color={theme.primary} />
+                              </View>
+                            );
+                          }
+                          return null;
+                        })()}
                         {note.type === 'drawing' && (() => {
                           let preview: string | null = null;
                           try {
@@ -334,11 +477,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
+  },
+  iconButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   searchInput: {
     flex: 1,
@@ -348,6 +493,22 @@ const styles = StyleSheet.create({
   scrollContent: {
     padding: 24,
     paddingTop: 8,
+  },
+  streakBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: '#FF6B00',
+    borderRadius: 20,
+    paddingHorizontal: 20,
+    paddingVertical: 14,
+    marginBottom: 16,
+  },
+  streakBannerText: {
+    flex: 1,
+    color: '#FFF',
+    fontSize: 15,
+    fontWeight: '700',
   },
   helperText: {
     fontSize: 16,

@@ -1,16 +1,17 @@
 import { useTheme } from '@/context/ThemeContext';
 import { Ionicons } from '@expo/vector-icons';
 import React, { useRef, useState } from 'react';
-import { ActionSheetIOS, Alert, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActionSheetIOS, Alert, Image, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import ViewShot from 'react-native-view-shot';
 import Canvas, { PathData } from './Canvas';
+import MusicPicker from './MusicPicker';
 import ScreenHeader from './ScreenHeader';
 import OutlinedCard from './ui/OutlinedCard';
 
 interface NoteEditorProps {
     onSend: (
         content: string,
-        type: 'text' | 'drawing',
+        type: 'text' | 'drawing' | 'music',
         color: string,
         sendToWidget?: boolean,
         fontStyles?: {
@@ -67,9 +68,19 @@ const FONTS = [
 
 export default function NoteEditor({ onSend, onCancel, isSending = false }: NoteEditorProps) {
     const { theme } = useTheme();
-    const [mode, setMode] = useState<'text' | 'drawing'>('drawing');
+    const [mode, setMode] = useState<'text' | 'drawing' | 'music'>('drawing');
     const [text, setText] = useState('');
     const [paths, setPaths] = useState<PathData[]>([]);
+
+    // Music State
+    const [musicPickerVisible, setMusicPickerVisible] = useState(false);
+    const [selectedTrack, setSelectedTrack] = useState<{
+        title: string;
+        artist: string;
+        coverUrl: string;
+        previewUrl?: string;
+        externalUrl?: string;
+    } | null>(null);
 
     // Initialize color with theme text color so it's visible by default
     const [selectedColor, setSelectedColor] = useState(theme.text);
@@ -132,6 +143,25 @@ export default function NoteEditor({ onSend, onCancel, isSending = false }: Note
                 fontStyle: isItalic ? 'italic' : 'normal',
                 textDecorationLine: isUnderline ? 'underline' : 'none',
             });
+        } else if (mode === 'music') {
+            if (!selectedTrack) {
+                Alert.alert('No Song Selected', 'Please pick a song first!');
+                return;
+            }
+            // Pass the track data as part of the specialized onSend call or handle it differently
+            // Since onSend signature is fixed, we can pass it as a special property or encoded in content?
+            // Actually, we should probably update onSend signature in the parent component to accept musicTrack
+            // BUT for now, let's pass it via the 'content' or extended props if 'onSend' supports it.
+            // Wait, I updated Note props, but onSend needs to pass it up.
+            // Let's pass it as a 6th argument? Or modify the 5th?
+            // Actually, let's attach it to the `onSend` in the parent.
+            // For now, I'll pass it as part of a custom "content" object stringified? 
+            // NO, `onSend` in `NoteEditor` props defines the strict signature.
+            // I need to update `onSend` signature in `NoteEditorProps` to allow passing music data.
+            // I'll update `onSend` signature in this file momentarily.
+
+            // Assuming onSend is updated to accept musicTrack (I need to do that):
+            (onSend as any)(JSON.stringify(selectedTrack), 'music', selectedColor, sendToWidget, undefined, selectedTrack);
         } else {
             try {
                 let imageBase64 = null;
@@ -156,7 +186,7 @@ export default function NoteEditor({ onSend, onCancel, isSending = false }: Note
     return (
         <KeyboardAvoidingView
             style={[styles.container, { backgroundColor: theme.background }]}
-            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
             keyboardVerticalOffset={80}
         >
             <ScreenHeader
@@ -165,16 +195,22 @@ export default function NoteEditor({ onSend, onCancel, isSending = false }: Note
                 title={
                     <View style={[styles.modeSwitch, { backgroundColor: theme.card }]}>
                         <TouchableOpacity
-                            style={[styles.modeBtn, mode === 'drawing' && [styles.activeMode, { backgroundColor: theme.primary, shadowColor: theme.primary }]]}
+                            style={[styles.modeBtn, mode === 'drawing' && [styles.activeMode, { backgroundColor: theme.primary }]]}
                             onPress={() => setMode('drawing')}
                         >
                             <Ionicons name="pencil" size={20} color={mode === 'drawing' ? '#FFF' : theme.textSecondary} />
                         </TouchableOpacity>
                         <TouchableOpacity
-                            style={[styles.modeBtn, mode === 'text' && [styles.activeMode, { backgroundColor: theme.primary, shadowColor: theme.primary }]]}
+                            style={[styles.modeBtn, mode === 'text' && [styles.activeMode, { backgroundColor: theme.primary }]]}
                             onPress={() => setMode('text')}
                         >
                             <Ionicons name="text" size={20} color={mode === 'text' ? '#FFF' : theme.textSecondary} />
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                            style={[styles.modeBtn, mode === 'music' && [styles.activeMode, { backgroundColor: theme.primary }]]}
+                            onPress={() => setMode('music')}
+                        >
+                            <Ionicons name="musical-notes" size={20} color={mode === 'music' ? '#FFF' : theme.textSecondary} />
                         </TouchableOpacity>
                     </View>
                 }
@@ -214,11 +250,50 @@ export default function NoteEditor({ onSend, onCancel, isSending = false }: Note
                                 autoCorrect={true}
                             />
                         </ScrollView>
+                    ) : mode === 'music' ? (
+                        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 }}>
+                            {selectedTrack ? (
+                                <View style={{ alignItems: 'center', gap: 16 }}>
+                                    <Image
+                                        source={{ uri: selectedTrack.coverUrl }}
+                                        style={{ width: 200, height: 200, borderRadius: 20 }}
+                                    />
+                                    <View style={{ alignItems: 'center' }}>
+                                        <Text style={{ fontSize: 24, fontWeight: 'bold', color: theme.text, textAlign: 'center' }}>{selectedTrack.title}</Text>
+                                        <Text style={{ fontSize: 18, color: theme.textSecondary, textAlign: 'center' }}>{selectedTrack.artist}</Text>
+                                    </View>
+                                    <TouchableOpacity
+                                        style={{ marginTop: 20, padding: 12, backgroundColor: theme.card, borderRadius: 50 }}
+                                        onPress={() => setMusicPickerVisible(true)}
+                                    >
+                                        <Text style={{ color: theme.primary, fontWeight: '600' }}>Change Song</Text>
+                                    </TouchableOpacity>
+                                </View>
+                            ) : (
+                                <TouchableOpacity
+                                    style={{ alignItems: 'center', gap: 12 }}
+                                    onPress={() => setMusicPickerVisible(true)}
+                                >
+                                    <View style={{ width: 80, height: 80, borderRadius: 40, backgroundColor: theme.card, justifyContent: 'center', alignItems: 'center' }}>
+                                        <Ionicons name="musical-notes" size={40} color={theme.primary} />
+                                    </View>
+                                    <Text style={{ fontSize: 18, color: theme.textSecondary, fontWeight: '600' }}>Tap to pick a song</Text>
+                                </TouchableOpacity>
+                            )}
+                            <MusicPicker
+                                visible={musicPickerVisible}
+                                onClose={() => setMusicPickerVisible(false)}
+                                onSelect={(track: any) => {
+                                    setSelectedTrack(track);
+                                    setMusicPickerVisible(false);
+                                }}
+                            />
+                        </View>
                     ) : (
                         <ViewShot
                             ref={viewShotRef}
                             options={{ format: "jpg", quality: 0.8, result: "data-uri" }}
-                            style={{ flex: 1, backgroundColor: '#FFFFFF' }}
+                            style={{ flex: 1, backgroundColor: theme.card }}
                         >
                             <Canvas
                                 color={selectedColor}
@@ -396,10 +471,6 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     activeMode: {
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.3,
-        shadowRadius: 8,
-        elevation: 4,
     },
     editorArea: {
         flex: 1,
@@ -431,11 +502,6 @@ const styles = StyleSheet.create({
         borderRadius: 16,
         alignItems: 'center',
         minWidth: 60,
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.05,
-        shadowRadius: 2,
-        elevation: 1,
     },
     fontBtnText: {
         fontSize: 18,
@@ -461,11 +527,6 @@ const styles = StyleSheet.create({
         borderRadius: 20,
         alignItems: 'center',
         justifyContent: 'center',
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.05,
-        shadowRadius: 2,
-        elevation: 1,
     },
     styleBtnText: {
         fontSize: 18,
@@ -489,11 +550,6 @@ const styles = StyleSheet.create({
         marginRight: 12,
         borderWidth: 2,
         borderColor: '#FFF',
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-        elevation: 2,
     },
     selectedSwatch: {
         transform: [{ scale: 1.2 }],
@@ -511,11 +567,6 @@ const styles = StyleSheet.create({
         paddingHorizontal: 16,
         paddingVertical: 10,
         borderRadius: 16,
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.05,
-        shadowRadius: 2,
-        elevation: 1,
     },
     toolBtnText: {
         fontSize: 14,

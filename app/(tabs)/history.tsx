@@ -231,7 +231,13 @@ export default function HistoryScreen() {
 
                             <View style={[styles.typeBadge, { backgroundColor: theme.background }]}>
                                 <Ionicons
-                                    name={item.type === 'drawing' ? 'brush' : item.type === 'collage' ? 'images' : 'text'}
+                                    name={
+                                        item.type === 'drawing' ? 'brush' :
+                                            item.type === 'collage' ? 'images' :
+                                                item.type === 'music' ? 'musical-notes' :
+                                                    item.type === 'tasks' ? 'checkbox-outline' :
+                                                        'text'
+                                    }
                                     size={12}
                                     color={theme.textSecondary}
                                 />
@@ -272,6 +278,52 @@ export default function HistoryScreen() {
                             {item.images.slice(0, 4).map((img, index) => (
                                 <Image key={index} source={{ uri: img }} style={styles.collageImage} />
                             ))}
+                        </View>
+                    )}
+
+                    {item.type === 'music' && (() => {
+                        let track = item.musicTrack;
+                        if (!track) { try { track = JSON.parse(item.content); } catch (e) { } }
+                        if (track) {
+                            return (
+                                <View style={[styles.imageContainer, { backgroundColor: theme.background, flexDirection: 'row', alignItems: 'center', padding: 16 }]}>
+                                    <Image source={{ uri: track.coverUrl }} style={{ width: 80, height: 80, borderRadius: 12, marginRight: 16 }} />
+                                    <View style={{ flex: 1 }}>
+                                        <ThemedText style={{ fontSize: 18, fontWeight: 'bold', color: theme.text }} numberOfLines={2}>{track.title}</ThemedText>
+                                        <ThemedText style={{ color: theme.textSecondary, marginTop: 4 }} numberOfLines={1}>{track.artist}</ThemedText>
+                                    </View>
+                                </View>
+                            );
+                        }
+                        return null;
+                    })()}
+
+                    {item.type === 'tasks' && item.tasks && item.tasks.length > 0 && (
+                        <View style={[styles.tasksContainer, { backgroundColor: theme.background }]}>
+                            {item.tasks.slice(0, 4).map((task) => (
+                                <View key={task.id} style={styles.taskRow}>
+                                    <Ionicons
+                                        name={task.completed ? 'checkmark-circle' : 'ellipse-outline'}
+                                        size={18}
+                                        color={task.completed ? '#34C759' : theme.textSecondary}
+                                    />
+                                    <ThemedText
+                                        style={[
+                                            styles.taskText,
+                                            { color: task.completed ? theme.textSecondary : theme.text },
+                                            task.completed && styles.taskTextDone
+                                        ]}
+                                        numberOfLines={1}
+                                    >
+                                        {task.text}
+                                    </ThemedText>
+                                </View>
+                            ))}
+                            {item.tasks.length > 4 && (
+                                <ThemedText style={[styles.taskMore, { color: theme.textSecondary }]}>
+                                    +{item.tasks.length - 4} more
+                                </ThemedText>
+                            )}
                         </View>
                     )}
                 </View>
@@ -342,11 +394,6 @@ const styles = StyleSheet.create({
         backgroundColor: '#FFFFFF',
         padding: 20,
         borderRadius: 24,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.05,
-        shadowRadius: 8,
-        elevation: 2,
     },
     cardHeader: {
         flexDirection: 'row',
@@ -446,5 +493,29 @@ const styles = StyleSheet.create({
     emptySubtext: {
         fontSize: 14,
         fontWeight: '500',
+    },
+    taskText: {
+        fontSize: 14,
+        fontWeight: '500',
+        flex: 1,
+    },
+    taskTextDone: {
+        opacity: 0.5,
+    },
+    tasksContainer: {
+        borderRadius: 16,
+        padding: 12,
+        gap: 8,
+    },
+    taskRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 10,
+    },
+    taskMore: {
+        fontSize: 12,
+        fontWeight: '600',
+        marginTop: 4,
+        paddingLeft: 28,
     },
 });

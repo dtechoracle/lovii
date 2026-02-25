@@ -70,16 +70,21 @@ export const NotificationService = {
             const data = notification.request.content.data;
             console.log('[NotificationService] Notification received:', data);
 
-            if (data?.type === 'WIDGET_UPDATE') {
+            if (data?.type === 'WIDGET_UPDATE' || data?.type === 'NOTE_RECEIVED') {
                 console.log('[NotificationService] Widget update trigger received');
-                StorageService.updateWidget();
+
+                if (data?.note) {
+                    // WEBHOOK STYLE: Data is in the payload!
+                    // Process immediately without fetching
+                    StorageService.processIncomingPartnerNote(data.note as any);
+                } else {
+                    // Fallback: Fetch from server
+                    StorageService.updateWidget();
+                }
 
                 // Also refresh partner notes in app if open
                 StorageService.getPartnerNotes().then((notes) => {
-                    // This just refreshes the cache, the view might need context update
-                    // But StorageService.subscribeToPartnerNotes in layout handles the polling anyway 
-                    // so we might just want to trigger a manual check there?
-                    // Actually StorageService.updateWidget calls getPartnerNotes which updates local cache
+                    // This just refreshes the cache
                 });
             }
         });

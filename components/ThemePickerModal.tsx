@@ -138,11 +138,6 @@ const styles = StyleSheet.create({
         padding: 24,
         paddingTop: 16,
         maxHeight: '80%',
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: -4 },
-        shadowOpacity: 0.1,
-        shadowRadius: 20,
-        elevation: 10,
     },
     header: {
         flexDirection: 'row',
@@ -238,11 +233,6 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
         marginTop: 24,
-        shadowColor: "#4B6EFF",
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.3,
-        shadowRadius: 12,
-        elevation: 8,
     },
     saveButtonText: {
         fontSize: 18,

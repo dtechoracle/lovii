@@ -75,11 +75,5 @@ const styles = StyleSheet.create({
         backgroundColor: '#FFFFFF', // White background
         alignItems: 'center',
         justifyContent: 'center',
-        // Soft Shadow
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-        elevation: 2,
     },
 });

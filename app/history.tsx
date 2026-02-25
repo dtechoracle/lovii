@@ -83,7 +83,7 @@ export default function HistoryScreen() {
 
                         <View style={styles.typeBadge}>
                             <Ionicons
-                                name={item.type === 'drawing' ? 'brush' : item.type === 'collage' ? 'images' : 'text'}
+                                name={item.type === 'drawing' ? 'brush' : item.type === 'collage' ? 'images' : item.type === 'music' ? 'musical-notes' : 'text'}
                                 size={12}
                                 color="#8E8E93"
                             />
@@ -124,6 +124,29 @@ export default function HistoryScreen() {
                         {item.images.slice(0, 4).map((img, index) => (
                             <Image key={index} source={{ uri: img }} style={styles.collageImage} />
                         ))}
+                    </View>
+                )}
+
+                {item.type === 'music' && (
+                    <View style={{ gap: 8 }}>
+                        {item.musicTrack ? (
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: '#FFF', padding: 8, borderRadius: 16 }}>
+                                <Image
+                                    source={{ uri: item.musicTrack.coverUrl }}
+                                    style={{ width: 60, height: 60, borderRadius: 12, backgroundColor: '#EEE' }}
+                                />
+                                <View style={{ flex: 1 }}>
+                                    <Text style={{ fontSize: 16, fontWeight: 'bold', color: '#1C1C1E' }} numberOfLines={1}>{item.musicTrack.title}</Text>
+                                    <Text style={{ fontSize: 14, color: '#8E8E93' }} numberOfLines={1}>{item.musicTrack.artist}</Text>
+                                </View>
+                                <Ionicons name="play-circle" size={32} color={theme.primary} />
+                            </View>
+                        ) : (
+                            <View style={{ padding: 10, backgroundColor: '#FFEBEE', borderRadius: 8 }}>
+                                <Text style={{ color: '#D32F2F', fontWeight: 'bold' }}>Broken Music Note</Text>
+                                <Text style={{ fontSize: 10, fontFamily: 'monospace' }}>{JSON.stringify(item, null, 2)}</Text>
+                            </View>
+                        )}
                     </View>
                 )}
             </OutlinedCard>
@@ -172,11 +195,6 @@ const styles = StyleSheet.create({
         marginBottom: 20,
         padding: 20,
         borderRadius: 24,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.05,
-        shadowRadius: 8,
-        elevation: 2,
     },
     cardHeader: {
         flexDirection: 'row',

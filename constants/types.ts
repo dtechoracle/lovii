@@ -19,14 +19,22 @@ export interface Comment {
 
 export interface Note {
     id: string;
-    type: 'text' | 'drawing' | 'collage';
+    type: 'text' | 'drawing' | 'collage' | 'music' | 'tasks';
     content: string;
     timestamp: number;
     color?: string;
     images?: string[];
+    musicTrack?: {
+        title: string;
+        artist: string;
+        coverUrl: string;
+        previewUrl?: string;
+        externalUrl?: string;
+    };
     pinned?: boolean;
     bookmarked?: boolean;
     userId?: string; // Who created the note
+    tasks?: Task[]; // For task lists sent to widget
     reactions?: Reaction[];
     comments?: Comment[];
     // Font styling
@@ -48,6 +56,8 @@ export interface UserProfile {
     themePreference?: ThemePreference;
     themeMode?: ThemeMode;
     avatarUri?: string;
+    points?: number;
+    maxPoints?: number;
     // Deprecated but kept for migration
     gender?: 'male' | 'female';
 }

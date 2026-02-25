@@ -17,6 +17,8 @@ export default function Splash() {
 
         const user = await StorageService.getProfile();
         if (user) {
+            // Trigger widget update on app open to ensure it's not empty
+            StorageService.updateWidget().catch(e => console.log('Initial widget update failed', e));
             router.replace('/(tabs)');
         } else {
             router.replace('/auth/login');

@@ -77,7 +77,7 @@ export default function LoginScreen() {
                                     value={code}
                                     onChangeText={setCode}
                                     autoCapitalize="characters"
-                                    maxLength={10}
+                                    maxLength={15}
                                 />
                             </View>
                             <View style={styles.divider} />
@@ -187,11 +187,6 @@ const styles = StyleSheet.create({
         marginLeft: 52,
     },
     buttonContainer: {
-        shadowColor: "#FFF",
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.1,
-        shadowRadius: 12,
-        elevation: 5,
     },
     button: {
         height: 64,

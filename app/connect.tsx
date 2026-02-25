@@ -35,24 +35,35 @@ export default function ConnectScreen() {
     }, []);
 
     const loadProfile = async () => {
+        // 1. Get cached profile first for immediate UI
         let p = await StorageService.getProfile();
-        if (!p) {
-            p = await StorageService.createProfile();
+        if (p) {
+            setProfile(p);
+            setMyCode(p.partnerCode);
+            if (p.partnerName) setPartnerName(p.partnerName);
+            if (p.connectedPartnerCode) setCode(p.connectedPartnerCode);
+            if (p.avatarUri) setAvatarUri(p.avatarUri);
+
+            if (p.connectedPartnerId && !p.connectedPartnerId.startsWith('partner_')) {
+                setConnectionStatus('connected');
+            } else {
+                setConnectionStatus('none');
+            }
         }
-        setProfile(p);
-        setMyCode(p.partnerCode);
 
-        // Load existing data
-        if (p.partnerName) setPartnerName(p.partnerName);
-        if (p.connectedPartnerCode) setCode(p.connectedPartnerCode);
-        if (p.avatarUri) setAvatarUri(p.avatarUri);
-
-        // Set initial connection status based on whether we have a verified partner ID
-        // A real partner ID won't start with 'partner_' (that's just a temporary placeholder)
-        if (p.connectedPartnerId && !p.connectedPartnerId.startsWith('partner_')) {
-            setConnectionStatus('connected');
-        } else {
-            setConnectionStatus('none');
+        // 2. Force a sync to get the latest profile
+        const userId = await StorageService.getProfile().then(prof => prof?.id);
+        if (userId) {
+            const synced = await StorageService.syncProfile(userId);
+            if (synced) {
+                setProfile(synced);
+                if (synced.partnerName) setPartnerName(synced.partnerName);
+                if (synced.connectedPartnerCode) setCode(synced.connectedPartnerCode);
+                if (synced.avatarUri) setAvatarUri(synced.avatarUri);
+                if (synced.connectedPartnerId && !synced.connectedPartnerId.startsWith('partner_')) {
+                    setConnectionStatus('connected');
+                }
+            }
         }
     };
 
@@ -65,7 +76,7 @@ export default function ConnectScreen() {
             }
 
             const result = await ImagePicker.launchImageLibraryAsync({
-                mediaTypes: 'images',
+                mediaTypes: ImagePicker.MediaTypeOptions.Images,
                 allowsEditing: true,
                 aspect: [1, 1],
                 quality: 0.8,
@@ -111,43 +122,59 @@ export default function ConnectScreen() {
                 }
 
                 // Try to connect to partner
-                const success = await StorageService.connectToPartner(code);
+                const result = await StorageService.connectToPartner(code);
 
-                if (!success) {
-                    console.log('Connection failed');
+                if (!result.success) {
+                    console.log('Connection failed:', result.error);
                     setConnectionStatus('failed');
-                    setAlertConfig({
-                        visible: true,
-                        title: 'Connection Failed',
-                        message: 'Could not find a partner with that code. Please check the code and try again.',
-                        options: [{
-                            text: 'OK',
-                            onPress: () => {
-                                setCode(''); // Clear the invalid code
-                            },
-                            style: 'cancel'
-                        }]
-                    });
+
+                    // Handle insufficient points specifically
+                    if (result.error?.includes('points')) {
+                        setAlertConfig({
+                            visible: true,
+                            title: 'Need More Points! 💝',
+                            message: result.error,
+                            options: [
+                                { text: 'Back', onPress: () => { }, style: 'cancel' },
+                                {
+                                    text: 'Get Points',
+                                    onPress: () => { router.push('/pricing') },
+                                    style: 'default'
+                                }
+                            ]
+                        });
+                    } else {
+                        setAlertConfig({
+                            visible: true,
+                            title: 'Connection Failed',
+                            message: result.error || 'Could not find a partner with that code.',
+                            options: [{
+                                text: 'OK',
+                                onPress: () => { setCode(''); },
+                                style: 'cancel'
+                            }]
+                        });
+                    }
                     setIsConnecting(false);
                     return;
                 }
 
-                // Success! Refresh profile to get partner details
-                const latest = await StorageService.getProfile();
+                // Success! Force a fresh sync directly to ensure state is updated
+                const userId = profile.id;
+                const latest = await StorageService.syncProfile(userId);
                 if (latest) {
                     setProfile(latest);
                     setConnectionStatus('connected');
+                    setCode(''); // Clear input on success
                 }
 
                 setAlertConfig({
                     visible: true,
                     title: '🎉 Connected!',
-                    message: `You're now connected to ${latest?.partnerName || 'your partner'}!`,
+                    message: `Successfully connected! ${(result as any).pointsDeducted ? '5 points deducted. 💝' : ''}`,
                     options: [{
-                        text: 'OK',
-                        onPress: () => {
-                            // Keep the code visible
-                        },
+                        text: 'Amazing!',
+                        onPress: () => { },
                         style: 'cancel'
                     }]
                 });
@@ -172,6 +199,29 @@ export default function ConnectScreen() {
         } finally {
             setIsConnecting(false);
         }
+    };
+
+    const handleDisconnect = (partnerId: string, partnerName: string) => {
+        setAlertConfig({
+            visible: true,
+            title: 'Disconnect?',
+            message: `Are you sure you want to disconnect from ${partnerName || 'this partner'}?`,
+            options: [
+                { text: 'Cancel', onPress: () => { }, style: 'cancel' },
+                {
+                    text: 'Disconnect',
+                    onPress: async () => {
+                        const success = await StorageService.disconnectFromPartner(partnerId);
+                        if (success) {
+                            await loadProfile();
+                        } else {
+                            Alert.alert('Error', 'Failed to disconnect. Please try again.');
+                        }
+                    },
+                    style: 'destructive'
+                }
+            ]
+        });
     };
 
     const handleShare = async () => {
@@ -217,8 +267,8 @@ export default function ConnectScreen() {
     const inputStyle = {
         backgroundColor: theme.textSecondary + '1A', // 10% opacity of text secondary
         color: theme.text,
-        borderColor: theme.border,
-        borderWidth: 1,
+        borderColor: 'transparent',
+        borderWidth: 0,
     };
 
     return (
@@ -227,7 +277,10 @@ export default function ConnectScreen() {
             <ScrollView contentContainerStyle={styles.content}>
                 {/* Profile Section */}
                 <OutlinedCard style={[styles.card, { backgroundColor: theme.card, borderColor: theme.border }]}>
-                    <ThemedText type="subtitle" style={[styles.label, { color: theme.textSecondary }]}>Profile</ThemedText>
+                    <View style={styles.sectionHeader}>
+                        <Ionicons name="person-circle-outline" size={24} color={theme.primary} />
+                        <ThemedText type="subtitle" style={[styles.label, { color: theme.textSecondary }]}>Your Profile</ThemedText>
+                    </View>
                     <TouchableOpacity style={styles.avatarSection} onPress={handlePickImage}>
                         <View style={[styles.avatarContainer, { backgroundColor: theme.primary, borderColor: theme.card }]}>
                             {avatarUri ? (
@@ -240,23 +293,16 @@ export default function ConnectScreen() {
                             <Ionicons name="camera" size={16} color="#FFF" />
                         </View>
                     </TouchableOpacity>
+                    <ThemedText style={[styles.nameDisplay, { color: theme.text }]}>{profile?.name}</ThemedText>
                     <ThemedText style={[styles.hint, { color: theme.textSecondary }]}>Tap to change profile picture</ThemedText>
                 </OutlinedCard>
 
-                {/* Theme Section */}
+                {/* My Code Section */}
                 <OutlinedCard style={[styles.card, { backgroundColor: theme.card, borderColor: theme.border }]}>
-                    <ThemedText type="subtitle" style={[styles.label, { color: theme.textSecondary }]}>Appearance</ThemedText>
-                    <TouchableOpacity
-                        style={[styles.themeButton, { backgroundColor: theme.primary }]}
-                        onPress={() => setShowThemePicker(true)}
-                    >
-                        <Ionicons name="color-palette" size={20} color="#FFF" />
-                        <Text style={styles.themeButtonText}>Customize Theme</Text>
-                    </TouchableOpacity>
-                </OutlinedCard>
-
-                <OutlinedCard style={[styles.card, { backgroundColor: theme.card, borderColor: theme.border }]}>
-                    <ThemedText type="subtitle" style={[styles.label, { color: theme.textSecondary }]}>My Code</ThemedText>
+                    <View style={styles.sectionHeader}>
+                        <Ionicons name="share-social-outline" size={22} color={theme.primary} />
+                        <ThemedText type="subtitle" style={[styles.label, { color: theme.textSecondary }]}>Share Code</ThemedText>
+                    </View>
                     <TouchableOpacity
                         style={[styles.codeContainer, { backgroundColor: theme.textSecondary + '1A' }]}
                         onPress={handleShare}
@@ -264,10 +310,10 @@ export default function ConnectScreen() {
                         <ThemedText type="title" style={[styles.code, { color: theme.text }]}>{myCode}</ThemedText>
                         <Ionicons name="copy-outline" size={24} color={theme.primary} />
                     </TouchableOpacity>
-                    <ThemedText style={[styles.hint, { color: theme.textSecondary }]}>Tap to copy & share</ThemedText>
+                    <ThemedText style={[styles.hint, { color: theme.textSecondary }]}>Give this code to your partner to connect</ThemedText>
                 </OutlinedCard>
 
-                <View style={styles.divider}>
+                <View style={[styles.divider, { marginVertical: 20 }]}>
                     <View style={[styles.line, { backgroundColor: theme.border }]} />
                     <ThemedText style={[styles.or, { color: theme.textSecondary }]}>Connection</ThemedText>
                     <View style={[styles.line, { backgroundColor: theme.border }]} />
@@ -276,12 +322,13 @@ export default function ConnectScreen() {
                 <OutlinedCard style={[styles.card, { backgroundColor: theme.card, borderColor: theme.border }]}>
                     <ThemedText type="subtitle" style={[styles.label, { color: theme.textSecondary }]}>Partner Code</ThemedText>
                     <TextInput
-                        style={[styles.input, inputStyle]}
-                        placeholder="Ex. LOVII-A7B2X9"
+                        style={[styles.input, inputStyle, { marginBottom: 16 }]}
+                        placeholder="Ex. X7Y2Z9"
                         placeholderTextColor={theme.textSecondary}
                         value={code}
                         onChangeText={(t) => setCode(t.toUpperCase())}
                         maxLength={12}
+                        underlineColorAndroid="transparent"
                     />
 
                     <ThemedText type="subtitle" style={[styles.label, { color: theme.textSecondary }]}>Partner Name</ThemedText>
@@ -293,22 +340,30 @@ export default function ConnectScreen() {
                         onChangeText={setPartnerName}
                         autoCapitalize="words"
                         autoCorrect={true}
+                        underlineColorAndroid="transparent"
                     />
 
                     {connectionStatus === 'connected' ? (
-                        <View style={[styles.connectedBadge, { backgroundColor: '#E8F5E9' }]}>
+                        <View style={styles.connectedBadge}>
                             <Ionicons name="checkmark-circle" size={16} color="#34C759" />
-                            <ThemedText style={[styles.connectedText, { color: '#000' }]}>Connected to {profile?.partnerName || 'Partner'}</ThemedText>
+                            <ThemedText style={styles.connectedText}>Connected to {profile?.partnerName || 'Partner'}</ThemedText>
+
+                            <TouchableOpacity
+                                style={[styles.disconnectIcon, { marginLeft: 'auto' }]}
+                                onPress={() => handleDisconnect(profile?.connectedPartnerId || '', profile?.partnerName || '')}
+                            >
+                                <Ionicons name="close-circle" size={20} color="#FF3B30" />
+                            </TouchableOpacity>
                         </View>
                     ) : connectionStatus === 'connecting' ? (
-                        <View style={[styles.notConnectedBadge, { backgroundColor: theme.textSecondary + '1A' }]}>
-                            <Ionicons name="sync" size={16} color={theme.primary} />
-                            <ThemedText style={[styles.notConnectedText, { color: theme.primary }]}>Connecting...</ThemedText>
+                        <View style={styles.notConnectedBadge}>
+                            <Ionicons name="sync" size={16} color="#007AFF" />
+                            <ThemedText style={[styles.notConnectedText, { color: '#007AFF' }]}>Connecting...</ThemedText>
                         </View>
                     ) : (
-                        <View style={[styles.notConnectedBadge, { backgroundColor: theme.textSecondary + '1A' }]}>
+                        <View style={styles.notConnectedBadge}>
                             <Ionicons name="close-circle" size={16} color="#FF9500" />
-                            <ThemedText style={[styles.notConnectedText, { color: '#FF9500' }]}>Not Connected</ThemedText>
+                            <ThemedText style={styles.notConnectedText}>Not Connected</ThemedText>
                         </View>
                     )}
 
@@ -323,23 +378,35 @@ export default function ConnectScreen() {
                     </TouchableOpacity>
                 </OutlinedCard>
 
+                {/* Appearance Section */}
+                <OutlinedCard style={[styles.card, { backgroundColor: theme.card, borderColor: theme.border }]}>
+                    <View style={styles.sectionHeader}>
+                        <Ionicons name="color-palette-outline" size={22} color={theme.primary} />
+                        <ThemedText type="subtitle" style={[styles.label, { color: theme.textSecondary }]}>Appearance</ThemedText>
+                    </View>
+                    <TouchableOpacity
+                        style={[styles.themeButton, { backgroundColor: theme.primary }]}
+                        onPress={() => setShowThemePicker(true)}
+                    >
+                        <Ionicons name="color-wand" size={20} color="#FFF" />
+                        <Text style={styles.themeButtonText}>Customize Theme</Text>
+                    </TouchableOpacity>
+                </OutlinedCard>
 
-                {/* Buttons Container */}
-                <View style={{ gap: 16, marginTop: 10 }}>
-                    {/* Logout Button */}
+                {/* Account Actions */}
+                <View style={{ gap: 12, marginTop: 8 }}>
                     <TouchableOpacity style={[styles.actionBtn, { borderColor: theme.border, borderWidth: 1 }]} onPress={handleLogout}>
                         <Ionicons name="log-out-outline" size={20} color={theme.text} style={{ marginRight: 8 }} />
-                        <ThemedText style={[styles.actionBtnText, { color: theme.text }]}>Log Out</ThemedText>
+                        <Text style={[styles.actionBtnText, { color: theme.text }]}>Log Out</Text>
                     </TouchableOpacity>
 
-                    {/* Reset Button */}
-                    <TouchableOpacity style={[styles.actionBtn, { borderColor: '#FF3B30', borderWidth: 1 }]} onPress={handleReset}>
-                        <Ionicons name="trash-outline" size={20} color="#FF3B30" style={{ marginRight: 8 }} />
-                        <ThemedText style={[styles.actionBtnText, { color: '#FF3B30' }]}>Reset App Data</ThemedText>
+                    <TouchableOpacity style={[styles.actionBtn, { borderColor: '#FF3B3020', backgroundColor: '#FF3B3008' }]} onPress={handleReset}>
+                        <Ionicons name="refresh-outline" size={20} color="#FF3B30" style={{ marginRight: 8 }} />
+                        <Text style={[styles.actionBtnText, { color: '#FF3B30' }]}>Reset App Data</Text>
                     </TouchableOpacity>
                 </View>
 
-                <Text style={[styles.version, { color: theme.textSecondary }]}>v1.0.0</Text>
+                <Text style={[styles.version, { color: theme.textSecondary }]}>Lovii v1.0.0 • Premium Rewards</Text>
             </ScrollView>
 
             <CustomAlert
@@ -357,7 +424,6 @@ export default function ConnectScreen() {
         </View>
     );
 }
-
 const styles = StyleSheet.create({
     container: {
         flex: 1,
@@ -366,90 +432,128 @@ const styles = StyleSheet.create({
     content: {
         padding: 24,
         paddingBottom: 60,
-        gap: 24,
+        gap: 20,
     },
     card: {
-        padding: 24,
-        borderRadius: 32,
-        borderWidth: 1, // Added border for better visibility in dark mode if needed
+        padding: 20,
+        borderRadius: 28,
+        borderWidth: 0,
+    },
+    sectionHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        marginBottom: 16,
     },
     label: {
-        fontSize: 14,
-        fontWeight: '600',
-        marginBottom: 8,
+        fontSize: 13,
+        fontWeight: '700',
+        textTransform: 'uppercase',
+        letterSpacing: 0.5,
+        marginBottom: 0,
     },
+    avatarSection: {
+        alignItems: 'center',
+        marginVertical: 12,
+        position: 'relative',
+    },
+    avatarContainer: {
+        width: 100,
+        height: 100,
+        borderRadius: 50,
+        borderWidth: 4,
+        overflow: 'hidden',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    avatarImage: { width: '100%', height: '100%' },
+    avatarBadge: {
+        position: 'absolute',
+        bottom: 0,
+        right: '35%',
+        width: 30,
+        height: 30,
+        borderRadius: 15,
+        backgroundColor: '#4B6EFF',
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderWidth: 3,
+    },
+    nameDisplay: { fontSize: 22, fontWeight: '800', textAlign: 'center', marginBottom: 4 },
+    hint: { fontSize: 13, textAlign: 'center', opacity: 0.7 },
+
     codeContainer: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
         padding: 16,
         borderRadius: 20,
-        marginBottom: 8,
     },
-    code: {
-        fontSize: 24,
-        fontWeight: '700',
-        letterSpacing: 2,
-    },
-    hint: {
-        fontSize: 13,
-        textAlign: 'center',
-        marginTop: 8,
-    },
-    divider: {
+    code: { fontSize: 24, fontWeight: '800', letterSpacing: 2 },
+
+    partnersList: { gap: 12, marginTop: 4 },
+    partnerItem: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 16,
-        marginVertical: 8,
+        gap: 12,
+        padding: 12,
+        borderRadius: 16,
+        backgroundColor: 'rgba(0,0,0,0.03)',
     },
-    line: {
-        flex: 1,
-        height: 1,
-    },
-    or: {
-        fontSize: 14,
-        fontWeight: '600',
-    },
+    partnerAvatar: { width: 44, height: 44, borderRadius: 22, justifyContent: 'center', alignItems: 'center' },
+    partnerAvatarImg: { width: 44, height: 44, borderRadius: 22 },
+    partnerInfo: { flex: 1 },
+    partnerName: { fontSize: 15, fontWeight: '700' },
+    partnerCodeText: { fontSize: 12, opacity: 0.6 },
+    activeBadge: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 },
+    disconnectIcon: { padding: 4 },
+
+    emptyPartners: { alignItems: 'center', paddingVertical: 20 },
+
+    divider: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+    line: { flex: 1, height: 1, opacity: 0.3 },
+    or: { fontSize: 14, fontWeight: '600' },
+
+    inputLabel: { fontSize: 12, fontWeight: '600', marginBottom: 8, marginTop: 4 },
     input: {
-        borderRadius: 20,
-        padding: 16,
-        fontSize: 16,
-        fontWeight: '600',
-        marginBottom: 20,
-    },
-    button: {
-        padding: 16,
-        borderRadius: 24,
-        alignItems: 'center',
-        marginTop: 8,
         height: 56,
-        justifyContent: 'center',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.2,
-        shadowRadius: 8,
-        elevation: 4,
-    },
-    buttonDisabled: {
-        opacity: 0.6,
-    },
-    buttonText: {
-        color: '#FFF',
-        fontWeight: '600',
+        borderRadius: 16,
+        paddingHorizontal: 16,
         fontSize: 16,
+        fontWeight: '600',
+        marginBottom: 16,
     },
+
+    button: {
+        height: 56,
+        borderRadius: 28,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    buttonDisabled: { opacity: 0.6 },
+    buttonText: { color: '#FFF', fontSize: 16, fontWeight: '700' },
+
+    themeButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        height: 56,
+        borderRadius: 28,
+        gap: 10,
+    },
+    themeButtonText: { color: '#FFF', fontSize: 16, fontWeight: '600' },
+
     actionBtn: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        paddingHorizontal: 24,
         height: 56,
         borderRadius: 28,
-        width: '100%',
     },
-    actionBtnText: {
-        fontWeight: '600',
-        fontSize: 16,
-    },
+    actionBtnText: { fontSize: 16, fontWeight: '600' },
+
+    version: { textAlign: 'center', fontSize: 12, marginTop: 12, opacity: 0.5 },
+
     connectedBadge: {
         flexDirection: 'row',
         alignItems: 'center',
@@ -457,10 +561,12 @@ const styles = StyleSheet.create({
         marginBottom: 12,
         paddingVertical: 8,
         paddingHorizontal: 12,
+        backgroundColor: '#E8F5E9',
         borderRadius: 12,
         alignSelf: 'flex-start',
     },
     connectedText: {
+        color: '#34C759',
         fontSize: 14,
         fontWeight: '600',
     },
@@ -471,64 +577,13 @@ const styles = StyleSheet.create({
         marginBottom: 12,
         paddingVertical: 8,
         paddingHorizontal: 12,
+        backgroundColor: '#FFF3E0',
         borderRadius: 12,
         alignSelf: 'flex-start',
     },
     notConnectedText: {
+        color: '#FF9500',
         fontSize: 14,
         fontWeight: '600',
-    },
-    version: {
-        textAlign: 'center',
-        fontSize: 12,
-        marginTop: 24,
-    },
-    avatarSection: {
-        alignItems: 'center',
-        marginVertical: 16,
-        position: 'relative',
-    },
-    avatarContainer: {
-        width: 100,
-        height: 100,
-        borderRadius: 50,
-        alignItems: 'center',
-        justifyContent: 'center',
-        overflow: 'hidden',
-        borderWidth: 4,
-    },
-    avatarImage: {
-        width: '100%',
-        height: '100%',
-    },
-    avatarBadge: {
-        position: 'absolute',
-        bottom: 0,
-        right: '35%',
-        width: 32,
-        height: 32,
-        borderRadius: 16,
-        backgroundColor: '#4B6EFF',
-        alignItems: 'center',
-        justifyContent: 'center',
-        borderWidth: 3,
-    },
-    themeButton: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: 16,
-        borderRadius: 24,
-        gap: 12,
-        marginTop: 8,
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.2,
-        shadowRadius: 8,
-        elevation: 4,
-    },
-    themeButtonText: {
-        color: '#FFF',
-        fontWeight: '600',
-        fontSize: 16,
     },
 });

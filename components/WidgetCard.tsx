@@ -20,9 +20,16 @@ const CARD_HEIGHT = height * 0.5;
 const CARD_WIDTH = width - 48;
 
 export default function WidgetCard({ note, onPress, partnerName = 'Partner', myUserId, onNoteUpdate }: WidgetCardProps) {
-    const { theme } = useTheme();
+    const { theme, isDark } = useTheme();
     const isMyNote = note?.userId === myUserId;
     const [optionsVisible, setOptionsVisible] = useState(false);
+
+    // Dynamic styles for Dark Mode inverse
+    const cardBackgroundColor = isDark ? '#1C1C1E' : theme.card; // Dark grey in dark mode, card color (white) in light
+    const textColor = isDark ? '#FFFFFF' : theme.text;
+    const secondaryTextColor = isDark ? '#8E8E93' : theme.textSecondary;
+
+    // ... (keep handleAction) ...
 
     const handleAction = async (action: 'pin' | 'bookmark' | 'widget' | 'delete', selectedNote: Note) => {
         if (action === 'delete') {
@@ -53,25 +60,29 @@ export default function WidgetCard({ note, onPress, partnerName = 'Partner', myU
         }
     };
 
+
     const renderContent = () => {
         if (!note) {
             return (
                 <View style={styles.emptyState}>
                     <Ionicons name="heart" size={64} color={theme.primary + '40'} />
-                    <Text style={[styles.emptyText, { color: theme.textSecondary }]}>Tap to create your first note</Text>
-                    <Text style={[styles.emptySubtext, { color: theme.textSecondary }]}>Share moments together</Text>
+                    <Text style={[styles.emptyText, { color: secondaryTextColor }]}>Tap to create your first note</Text>
+                    <Text style={[styles.emptySubtext, { color: secondaryTextColor }]}>Share moments together</Text>
                 </View>
             );
         }
 
         if (note.type === 'text') {
+            const isNoteColorDefault = note.color === '#FFFFFF' || !note.color;
+            const displayColor = (isDark && isNoteColorDefault) ? '#FFFFFF' : (note.color || textColor);
+
             return (
                 <View style={styles.textContent}>
                     <Text
                         style={[
                             styles.noteText,
                             {
-                                color: (theme.dark && (note.color === '#1C1C1E' || !note.color)) ? '#FFFFFF' : (note.color || theme.text),
+                                color: displayColor,
                                 fontFamily: note.fontFamily,
                                 fontWeight: (note.fontWeight as any) || 'normal',
                                 fontStyle: (note.fontStyle as any) || 'normal',
@@ -104,7 +115,25 @@ export default function WidgetCard({ note, onPress, partnerName = 'Partner', myU
                 console.error('Failed to parse drawing content', e);
             }
 
-            // If we have a preview image, show it instead of rendering SVG paths
+            // Render SVG paths first (ensures transparency for dark mode)
+            if (paths.length > 0) {
+                // If note color is black/default and we are in dark mode, use white (textColor)
+                const isNoteColorDefault = note.color === '#000000' || note.color === '#FFFFFF' || !note.color;
+                const drawingColor = (isDark && isNoteColorDefault) ? '#FFFFFF' : (note.color || textColor);
+
+                return (
+                    <View style={styles.drawingContent}>
+                        <DrawingViewer
+                            paths={paths}
+                            color={drawingColor}
+                            width={CARD_WIDTH}
+                            height={CARD_HEIGHT - 100}
+                        />
+                    </View>
+                );
+            }
+
+            // Fallback: If no paths but we have a preview image
             if (preview) {
                 return (
                     <View style={styles.drawingContent}>
@@ -120,18 +149,35 @@ export default function WidgetCard({ note, onPress, partnerName = 'Partner', myU
                     </View>
                 );
             }
+        }
 
-            // Fallback: render SVG paths
-            return (
-                <View style={styles.drawingContent}>
-                    <DrawingViewer
-                        paths={paths}
-                        color={note.color || theme.text}
-                        width={CARD_WIDTH}
-                        height={CARD_HEIGHT - 100}
-                    />
-                </View>
-            );
+        if (note.type === 'music') {
+            let track = note.musicTrack;
+            if (!track) {
+                try { track = JSON.parse(note.content); } catch (e) { }
+            }
+            if (track) {
+                return (
+                    <View style={styles.drawingContent}>
+                        <Image
+                            source={{ uri: track.coverUrl }}
+                            style={{
+                                width: CARD_WIDTH - 48,
+                                height: CARD_HEIGHT - 120,
+                                borderRadius: 20,
+                                position: 'absolute',
+                                opacity: 0.3
+                            }}
+                            resizeMode="cover"
+                        />
+                        <View style={{ alignItems: 'center', backgroundColor: isDark ? 'rgba(0,0,0,0.6)' : 'rgba(255,255,255,0.7)', padding: 20, borderRadius: 24, width: '90%' }}>
+                            <Ionicons name="musical-notes" size={48} color={theme.primary} />
+                            <Text style={{ fontSize: 22, fontWeight: '700', color: textColor, marginTop: 12, textAlign: 'center' }}>{track.title}</Text>
+                            <Text style={{ fontSize: 16, fontWeight: '500', color: secondaryTextColor, marginTop: 4, textAlign: 'center' }}>{track.artist}</Text>
+                        </View>
+                    </View>
+                );
+            }
         }
 
         if (note.type === 'collage' && note.images) {
@@ -150,7 +196,7 @@ export default function WidgetCard({ note, onPress, partnerName = 'Partner', myU
     return (
         <>
             <TouchableOpacity activeOpacity={0.9} onPress={onPress}>
-                <OutlinedCard style={[styles.card, { backgroundColor: theme.card }]}>
+                <OutlinedCard style={[styles.card, { backgroundColor: cardBackgroundColor }]}>
                     <View style={styles.cardHeader}>
                         <View style={styles.headerLeft}>
                             {note && (
@@ -168,13 +214,13 @@ export default function WidgetCard({ note, onPress, partnerName = 'Partner', myU
                                     </Text>
                                 </View>
                             )}
-                            <Text style={[styles.cardTitle, { color: theme.text }]}>
+                            <Text style={[styles.cardTitle, { color: textColor }]}>
                                 {note ? 'Latest Note' : 'No Notes Yet'}
                             </Text>
                         </View>
                         {note && (
                             <TouchableOpacity onPress={() => setOptionsVisible(true)} style={styles.menuButton}>
-                                <Ionicons name="ellipsis-horizontal" size={24} color={theme.textSecondary} />
+                                <Ionicons name="ellipsis-horizontal" size={24} color={secondaryTextColor} />
                             </TouchableOpacity>
                         )}
                     </View>
@@ -183,9 +229,9 @@ export default function WidgetCard({ note, onPress, partnerName = 'Partner', myU
 
                     {note && (
                         <View style={styles.footer}>
-                            <View style={[styles.badge, { backgroundColor: theme.background }]}>
-                                <Ionicons name="time" size={14} color={theme.textSecondary} style={{ marginRight: 4 }} />
-                                <Text style={[styles.badgeText, { color: theme.textSecondary }]}>
+                            <View style={[styles.badge, { backgroundColor: isDark ? '#2C2C2E' : '#F2F2F7' }]}>
+                                <Ionicons name="time" size={14} color={secondaryTextColor} style={{ marginRight: 4 }} />
+                                <Text style={[styles.badgeText, { color: secondaryTextColor }]}>
                                     {new Date(note.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                 </Text>
                             </View>

@@ -3,7 +3,7 @@ import OutlinedCard from '@/components/ui/OutlinedCard';
 import { useTheme } from '@/context/ThemeContext';
 import { Note, StorageService } from '@/services/storage';
 import { Ionicons } from '@expo/vector-icons';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import * as ImageManipulator from 'expo-image-manipulator';
 import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
@@ -13,14 +13,15 @@ import { Alert, Dimensions, Image, ScrollView, StyleSheet, Text, TouchableOpacit
 const { width } = Dimensions.get('window');
 const GRID_PADDING = 24;
 const GRID_GAP = 12;
-const MAX_IMAGES = 9; // Support up to 9 images (3x3 grid)
-const COLUMNS = 3; // Always use 3 columns for better layout
+const MAX_IMAGES = 4; // Support up to 4 images (2x2 grid)
+const COLUMNS = 2; // Use 2 columns for 4 images
 const IMAGE_SIZE = (width - (GRID_PADDING * 2) - (GRID_GAP * (COLUMNS - 1))) / COLUMNS;
 
 export default function CollageScreen() {
     const router = useRouter();
     const { theme } = useTheme();
     const [images, setImages] = useState<string[]>([]);
+    const [loading, setLoading] = useState(false);
 
     const pickImage = async () => {
         if (images.length >= MAX_IMAGES) {
@@ -55,16 +56,17 @@ export default function CollageScreen() {
 
     const handleSend = async () => {
         if (images.length === 0) return;
+        setLoading(true);
 
         // Compress and Convert to Base64
         const processedImages: string[] = [];
         try {
             for (const uri of images) {
-                // Resize to max 800px width to keep payload reasonable
+                // Resize to max 600px width (balanced for quality/size)
                 const manipulated = await ImageManipulator.manipulateAsync(
                     uri,
-                    [{ resize: { width: 800 } }],
-                    { compress: 0.7, format: ImageManipulator.SaveFormat.JPEG }
+                    [{ resize: { width: 600 } }],
+                    { compress: 0.5, format: ImageManipulator.SaveFormat.JPEG }
                 );
 
                 const base64 = await FileSystem.readAsStringAsync(manipulated.uri, {
@@ -82,11 +84,18 @@ export default function CollageScreen() {
                 timestamp: Date.now(),
             };
 
-            await StorageService.saveMyNote(note);
-            router.replace('/');
-        } catch (error) {
-            Alert.alert("Error", "Failed to process images. Please try fewer images.");
-            console.error(error);
+            const result = await StorageService.saveMyNote(note);
+
+            if (result.success) {
+                router.replace('/');
+            } else {
+                Alert.alert("Upload Failed", result.error || "Please check your connection and try again.");
+            }
+        } catch (error: any) {
+            console.error("Collage Error:", error);
+            Alert.alert("Error", `Failed to process images: ${error?.message || 'Unknown error'}`);
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -96,8 +105,10 @@ export default function CollageScreen() {
                 title="Create Collage"
                 showBack
                 rightAction={
-                    <TouchableOpacity onPress={handleSend} disabled={images.length === 0}>
-                        <Text style={[styles.sendText, images.length === 0 && styles.disabledText]}>Send</Text>
+                    <TouchableOpacity onPress={handleSend} disabled={images.length === 0 || loading}>
+                        <Text style={[styles.sendText, (images.length === 0 || loading) && styles.disabledText]}>
+                            {loading ? 'Sending...' : 'Send'}
+                        </Text>
                     </TouchableOpacity>
                 }
             />

@@ -10,7 +10,7 @@ export default function EditorScreen() {
 
     const handleSend = async (
         content: string,
-        type: 'text' | 'drawing',
+        type: 'text' | 'drawing' | 'music',
         color: string,
         sendToWidget: boolean = false,
         fontStyles?: {
@@ -18,6 +18,13 @@ export default function EditorScreen() {
             fontWeight?: string;
             fontStyle?: string;
             textDecorationLine?: string;
+        },
+        musicTrack?: {
+            title: string;
+            artist: string;
+            coverUrl: string;
+            previewUrl?: string;
+            externalUrl?: string;
         }
     ) => {
         if (isSending) return;
@@ -33,6 +40,7 @@ export default function EditorScreen() {
                 color,
                 // Add font styles if present
                 ...(fontStyles || {}),
+                musicTrack,
             };
 
             if (sendToWidget) {

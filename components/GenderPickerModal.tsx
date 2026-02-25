@@ -78,12 +78,6 @@ const styles = StyleSheet.create({
         borderRadius: 40,
         padding: 32,
         alignItems: 'center',
-        // Soft Shadow
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 10 },
-        shadowOpacity: 0.1,
-        shadowRadius: 20,
-        elevation: 10,
     },
     title: {
         fontSize: 28,

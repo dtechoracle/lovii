@@ -55,6 +55,7 @@ export default function RootLayout() {
               <Stack.Screen name="todo" options={{ headerShown: false, presentation: 'modal' }} />
               <Stack.Screen name="collage" options={{ headerShown: false, presentation: 'modal' }} />
               <Stack.Screen name="history" options={{ headerShown: false, presentation: 'modal' }} />
+              <Stack.Screen name="pricing" options={{ headerShown: false, presentation: 'modal' }} />
             </Stack>
             <StatusBar style="auto" />
           </NavThemeProvider>

@@ -39,8 +39,8 @@ export default function DrawingViewer({ paths, color, width, height, strokeWidth
                 } else {
                     drawingPaths = parsed.map((p: string) => ({ path: p, color }));
                 }
-            } else if (parsed.paths && Array.isArray(parsed.paths)) {
-                // Handle {paths: [...], preview: ...} format
+            } else if (parsed && typeof parsed === 'object' && parsed.paths && Array.isArray(parsed.paths)) {
+                // Handle {paths: [...], preview: ...} format from JSON string
                 if (parsed.paths.length > 0 && typeof parsed.paths[0] === 'object') {
                     drawingPaths = parsed.paths;
                 } else {
@@ -50,16 +50,62 @@ export default function DrawingViewer({ paths, color, width, height, strokeWidth
         } catch (e) {
             console.log('Error parsing drawing paths', e);
         }
+    } else if (typeof paths === 'object' && paths !== null) {
+        // NEW: Handle already-parsed object { paths: [...], preview: ... }
+        // This is what history.tsx passes after JSON.parse()
+        const pObj = paths as any;
+        if (pObj.paths && Array.isArray(pObj.paths)) {
+            if (pObj.paths.length > 0 && typeof pObj.paths[0] === 'object') {
+                drawingPaths = pObj.paths;
+            } else {
+                drawingPaths = pObj.paths.map((p: string) => ({ path: p, color }));
+            }
+        }
     }
 
     const isThumbnail = width < 200;
     const effectiveStrokeWidth = isThumbnail ? strokeWidth * 2 : strokeWidth;
 
+    // Calculate Bounding Box
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    let hasPoints = false;
+
+    drawingPaths.forEach(p => {
+        // Simple regex to extract coordinates from "M10,20L30,40..."
+        const matches = p.path.match(/[0-9.-]+,[0-9.-]+/g);
+        if (matches) {
+            matches.forEach(coord => {
+                const [x, y] = coord.split(',').map(Number);
+                if (!isNaN(x) && !isNaN(y)) {
+                    if (x < minX) minX = x;
+                    if (x > maxX) maxX = x;
+                    if (y < minY) minY = y;
+                    if (y > maxY) maxY = y;
+                    hasPoints = true;
+                }
+            });
+        }
+    });
+
+    // Add padding
+    const PADDING = 20; // 10px on each side
+    let viewBox = undefined;
+    if (hasPoints) {
+        const vbX = minX - 10;
+        const vbY = minY - 10;
+        const vbW = (maxX - minX) + 20;
+        const vbH = (maxY - minY) + 20;
+        // Ensure strictly positive to avoid SVG errors
+        if (vbW > 0 && vbH > 0) {
+            viewBox = `${vbX} ${vbY} ${vbW} ${vbH}`;
+        }
+    }
+
     return (
-        <View style={{ width, height, overflow: 'hidden' }}>
+        <View style={{ width, height, overflow: 'hidden', backgroundColor: 'transparent' }}>
             <Svg
                 style={StyleSheet.absoluteFill}
-                viewBox="0 0 400 400"
+                viewBox={viewBox}
                 preserveAspectRatio="xMidYMid meet"
             >
                 {drawingPaths.map((pathData, index) => (
