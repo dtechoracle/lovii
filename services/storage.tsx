@@ -58,25 +58,28 @@ export const StorageService = {
 
     async syncProfile(id: string): Promise<UserProfile | null> {
         try {
-            const res = await fetch(`${API_URL}/profile?id=${id}`);
+            const myId = await AsyncStorage.getItem(KEYS.USER_ID);
+            if (!myId) return null;
+
+            const res = await fetch(`${API_URL}/profile?userId=${myId}`);
             if (!res.ok) return null;
+
             const data = await res.json();
 
-            // Map API User -> UserProfile
-            const localGender = await AsyncStorage.getItem(KEYS.THEME_GENDER);
+            // Get local cache to preserve local-only settings
+            const localDataStr = await AsyncStorage.getItem(KEYS.USER_DATA);
+            const localData = localDataStr ? JSON.parse(localDataStr) : null;
+
+            const localGender = localData?.gender || await AsyncStorage.getItem(KEYS.THEME_GENDER);
             const localThemePref = await AsyncStorage.getItem(KEYS.THEME_PREF);
             const localThemeMode = await AsyncStorage.getItem(KEYS.THEME_MODE);
 
-            // NEW: Get local points before overwriting to support manual testing
-            const localData = await AsyncStorage.getItem(KEYS.USER_DATA);
-            const localPoints = localData ? JSON.parse(localData).points : 0;
-            const localMaxPoints = localData ? JSON.parse(localData).maxPoints : 0;
-
-            const currentPoints = Math.max(data.points || 0, localPoints || 0);
-            // maxPoints = the most points the user has ever had (ring reference)
-            // If maxPoints is 0 (no backend support yet) but user has points, seed it from current points
-            const currentMax = Math.max(data.maxPoints || 0, localMaxPoints || 0);
-            const effectiveMax = currentMax > 0 ? currentMax : currentPoints;
+            // Points from backend
+            const backendPoints = data.points ?? 0;
+            // maxPoints ensures the UI Ring shrinks/fills correctly. 
+            // It should be at least backendPoints, or the previous highest maxPoints.
+            const localMax = localData?.maxPoints ?? 0;
+            const newMaxPoints = Math.max(localMax, backendPoints);
 
             const profile: UserProfile = {
                 id: data.id,
@@ -88,8 +91,8 @@ export const StorageService = {
                 anniversary: data.connectedAt ? new Date(data.connectedAt).getTime() : undefined,
                 gender: (localGender as 'male' | 'female') || 'female',
                 avatarUri: data.avatar,
-                points: currentPoints,
-                maxPoints: effectiveMax,
+                points: backendPoints,
+                maxPoints: newMaxPoints,
                 themePreference: (localThemePref as any) || 'auto',
                 themeMode: (localThemeMode as any) || 'auto',
             };
@@ -205,8 +208,8 @@ export const StorageService = {
             name: user.name,
             partnerCode: user.code,
             avatarUri: user.avatar,
-            points: user.points,
-            maxPoints: user.maxPoints || user.points,
+            points: user.points ?? 0,
+            maxPoints: user.points ?? 0, // set highest max bound to 20 starting points
             gender: 'female', // Default
         };
         await this.saveLocalProfile(profile);
@@ -287,10 +290,20 @@ export const StorageService = {
             const p = await this.getProfile();
             if (!p) return false;
 
-            // Updated: Manually add points to local profile for testing
-            p.points = (p.points || 0) + points;
-            // When buying, the ring becomes full - so maxPoints = current points
-            p.maxPoints = p.points;
+            // Call Backend Add API
+            const res = await fetch(`${API_URL}/profile/add`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ userId: p.id, amount: points, reason: 'top_up' })
+            });
+
+            if (!res.ok) throw new Error('Failed to top up on backend');
+
+            const data = await res.json();
+
+            // Update local profile exactly to what backend returned
+            p.points = data.points;
+            p.maxPoints = Math.max(p.maxPoints || 0, p.points || 0);
             await this.saveLocalProfile(p);
             return true;
         } catch (e) {
