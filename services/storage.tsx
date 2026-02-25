@@ -771,31 +771,40 @@ export const StorageService = {
                 return { success: false, error: `You need ${STREAK_RESTORE_COST} points to restore your streak. You have ${p.points || 0}. 💝` };
             }
 
-            // Deduct locally first (optimistic)
+            // 1. Deduct locally (optimistic)
             p.points = (p.points || 0) - STREAK_RESTORE_COST;
             await this.saveLocalProfile(p);
 
-            // Persist today as a "restored" day so calculateStreak counts it
+            // 2. Persist today locally (offline fallback)
             const phantomKey = 'lovii_streak_restore_days';
             const restoredDaysJson = await AsyncStorage.getItem(phantomKey);
             const restoredDays: number[] = restoredDaysJson ? JSON.parse(restoredDaysJson) : [];
             const todayMidnight = (() => {
                 const d = new Date();
-                return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+                return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
             })();
             if (!restoredDays.includes(todayMidnight)) {
                 restoredDays.push(todayMidnight);
                 await AsyncStorage.setItem(phantomKey, JSON.stringify(restoredDays));
             }
 
-            // Sync deduction to server (fire-and-forget)
             const userId = await AsyncStorage.getItem(KEYS.USER_ID);
             if (userId) {
-                fetch(`${API_URL}/profile/deduct`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ userId, amount: STREAK_RESTORE_COST, reason: 'streak_restore' }),
-                }).catch(e => console.log('Streak restore sync failed', e));
+                // 3. Record on backend (streak_restores table) + deduct points audit
+                try {
+                    await fetch(`${API_URL}/streak/restore`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ userId }),
+                    });
+                    fetch(`${API_URL}/profile/deduct`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ userId, amount: STREAK_RESTORE_COST, reason: 'streak_restore' }),
+                    }).catch(() => { });
+                } catch (e) {
+                    console.log('Streak restore backend sync failed (offline?)', e);
+                }
             }
 
             return { success: true };
@@ -806,8 +815,27 @@ export const StorageService = {
 
     async getRestoredStreakDays(): Promise<number[]> {
         try {
+            // Start with local cache (offline fallback)
             const json = await AsyncStorage.getItem('lovii_streak_restore_days');
-            return json ? JSON.parse(json) : [];
+            const localDays: number[] = json ? JSON.parse(json) : [];
+
+            // Merge with server data (survives reinstalls)
+            const userId = await AsyncStorage.getItem(KEYS.USER_ID);
+            if (userId) {
+                try {
+                    const res = await fetch(`${API_URL}/streak?userId=${userId}`);
+                    if (res.ok) {
+                        const data = await res.json();
+                        const serverDays: number[] = data.restoredDays || [];
+                        // Merge and deduplicate
+                        const merged = Array.from(new Set([...localDays, ...serverDays]));
+                        // Update local cache with merged result
+                        await AsyncStorage.setItem('lovii_streak_restore_days', JSON.stringify(merged));
+                        return merged;
+                    }
+                } catch { /* offline — use local */ }
+            }
+            return localDays;
         } catch { return []; }
     },
 };
