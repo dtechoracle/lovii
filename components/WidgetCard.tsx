@@ -191,6 +191,50 @@ export default function WidgetCard({ note, onPress, partnerName = 'Partner', myU
                 </View>
             );
         }
+
+        if (note.type === 'tasks' && note.tasks && note.tasks.length > 0) {
+            const completed = note.tasks.filter(t => t.completed).length;
+            const total = note.tasks.length;
+            return (
+                <View style={styles.tasksContent}>
+                    <View style={styles.tasksHeader}>
+                        <Ionicons name="checkbox-outline" size={20} color={note.color || theme.primary} />
+                        <Text style={[styles.tasksTitle, { color: textColor }]}>Shared Tasks</Text>
+                        <View style={[styles.tasksBadge, { backgroundColor: (note.color || theme.primary) + '20' }]}>
+                            <Text style={[styles.tasksBadgeText, { color: note.color || theme.primary }]}>
+                                {completed}/{total} done
+                            </Text>
+                        </View>
+                    </View>
+                    <View style={styles.tasksList}>
+                        {note.tasks.slice(0, 5).map(task => (
+                            <View key={task.id} style={styles.taskRow}>
+                                <Ionicons
+                                    name={task.completed ? 'checkmark-circle' : 'ellipse-outline'}
+                                    size={20}
+                                    color={task.completed ? '#34C759' : secondaryTextColor}
+                                />
+                                <Text
+                                    style={[
+                                        styles.taskText,
+                                        { color: task.completed ? secondaryTextColor : textColor },
+                                        task.completed && { opacity: 0.5 }
+                                    ]}
+                                    numberOfLines={1}
+                                >
+                                    {task.text}
+                                </Text>
+                            </View>
+                        ))}
+                        {total > 5 && (
+                            <Text style={[styles.taskMore, { color: secondaryTextColor }]}>
+                                +{total - 5} more tasks
+                            </Text>
+                        )}
+                    </View>
+                </View>
+            );
+        }
     };
 
     return (
@@ -358,5 +402,49 @@ const styles = StyleSheet.create({
     },
     menuButton: {
         padding: 4,
+    },
+    tasksContent: {
+        flex: 1,
+        justifyContent: 'center',
+        paddingHorizontal: 4,
+    },
+    tasksHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        marginBottom: 16,
+    },
+    tasksTitle: {
+        fontSize: 16,
+        fontWeight: '700',
+        flex: 1,
+    },
+    tasksBadge: {
+        paddingHorizontal: 10,
+        paddingVertical: 4,
+        borderRadius: 12,
+    },
+    tasksBadgeText: {
+        fontSize: 12,
+        fontWeight: '700',
+    },
+    tasksList: {
+        gap: 12,
+    },
+    taskRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 10,
+    },
+    taskText: {
+        fontSize: 16,
+        fontWeight: '500',
+        flex: 1,
+    },
+    taskMore: {
+        fontSize: 13,
+        fontWeight: '600',
+        marginTop: 4,
+        paddingLeft: 30,
     },
 });

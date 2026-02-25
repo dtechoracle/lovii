@@ -215,7 +215,7 @@ export default function HomeScreen() {
         </View>
         <Link href="/pricing" asChild>
           <TouchableOpacity style={[styles.iconButton, { backgroundColor: theme.card }]}>
-            <PointsRing points={profile?.points || 0} max={10} />
+            <PointsRing points={profile?.points || 0} max={profile?.maxPoints || 10} />
           </TouchableOpacity>
         </Link>
         <Link href="/connect" asChild>

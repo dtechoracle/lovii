@@ -72,19 +72,24 @@ export const StorageService = {
             const localPoints = localData ? JSON.parse(localData).points : 0;
             const localMaxPoints = localData ? JSON.parse(localData).maxPoints : 0;
 
+            const currentPoints = Math.max(data.points || 0, localPoints || 0);
+            // maxPoints = the most points the user has ever had (ring reference)
+            // If maxPoints is 0 (no backend support yet) but user has points, seed it from current points
+            const currentMax = Math.max(data.maxPoints || 0, localMaxPoints || 0);
+            const effectiveMax = currentMax > 0 ? currentMax : currentPoints;
+
             const profile: UserProfile = {
                 id: data.id,
                 name: data.name || 'User',
-                partnerCode: data.code, // User Code = Partner Code
+                partnerCode: data.code,
                 connectedPartnerId: data.partnerId || undefined,
                 partnerName: data.partnerName || undefined,
-                connectedPartnerCode: data.partnerCode || undefined, // Correctly Map Partner's Code
+                connectedPartnerCode: data.partnerCode || undefined,
                 anniversary: data.connectedAt ? new Date(data.connectedAt).getTime() : undefined,
                 gender: (localGender as 'male' | 'female') || 'female',
                 avatarUri: data.avatar,
-                // Use higher value for testing purposes
-                points: Math.max(data.points || 0, localPoints || 0),
-                maxPoints: Math.max(data.maxPoints || 0, localMaxPoints || 0),
+                points: currentPoints,
+                maxPoints: effectiveMax,
                 themePreference: (localThemePref as any) || 'auto',
                 themeMode: (localThemeMode as any) || 'auto',
             };
