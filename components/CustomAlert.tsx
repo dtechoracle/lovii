@@ -1,41 +1,69 @@
+import { useTheme } from '@/context/ThemeContext';
 import React from 'react';
 import { Modal, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+
+interface AlertOption {
+    text: string;
+    onPress: () => void;
+    style?: 'default' | 'cancel' | 'destructive';
+}
 
 interface CustomAlertProps {
     visible: boolean;
     title: string;
     message?: string;
-    options: {
-        text: string;
-        onPress: () => void;
-        style?: 'default' | 'cancel' | 'destructive';
-    }[];
+    options: AlertOption[];
     onClose: () => void;
 }
 
 export default function CustomAlert({ visible, title, message, options, onClose }: CustomAlertProps) {
+    const { theme, isDark } = useTheme();
+
     return (
         <Modal
             visible={visible}
             transparent
             animationType="fade"
+            statusBarTranslucent
             onRequestClose={onClose}
         >
             <View style={styles.overlay}>
-                <View style={styles.container}>
+                <View style={[
+                    styles.container,
+                    {
+                        backgroundColor: isDark ? '#1C1C1E' : '#FFFFFF',
+                        borderColor: isDark ? '#2C2C2E' : '#E5E5EA',
+                    }
+                ]}>
+                    {/* Header */}
                     <View style={styles.header}>
-                        <Text style={styles.title}>{title}</Text>
-                        {message && <Text style={styles.message}>{message}</Text>}
+                        <Text style={[styles.title, { color: theme.text }]}>{title}</Text>
+                        {message && (
+                            <Text style={[styles.message, { color: theme.textSecondary }]}>{message}</Text>
+                        )}
                     </View>
 
+                    {/* Divider */}
+                    <View style={[styles.divider, { backgroundColor: isDark ? '#2C2C2E' : '#E5E5EA' }]} />
+
+                    {/* Buttons */}
                     <View style={styles.buttonContainer}>
                         {options.map((option, index) => (
                             <TouchableOpacity
                                 key={index}
+                                activeOpacity={0.7}
                                 style={[
                                     styles.button,
-                                    option.style === 'cancel' && styles.cancelButton,
-                                    option.style === 'destructive' && styles.destructiveButton,
+                                    index < options.length - 1 && {
+                                        borderBottomWidth: 1,
+                                        borderBottomColor: isDark ? '#2C2C2E' : '#E5E5EA',
+                                    },
+                                    option.style === 'cancel' && {
+                                        backgroundColor: isDark ? '#2C2C2E' : '#F2F2F7',
+                                    },
+                                    option.style === 'destructive' && {
+                                        backgroundColor: 'rgba(255, 59, 48, 0.08)',
+                                    },
                                 ]}
                                 onPress={() => {
                                     option.onPress();
@@ -45,8 +73,9 @@ export default function CustomAlert({ visible, title, message, options, onClose 
                                 <Text
                                     style={[
                                         styles.buttonText,
-                                        option.style === 'cancel' && styles.cancelText,
-                                        option.style === 'destructive' && styles.destructiveText,
+                                        { color: theme.primary },
+                                        option.style === 'cancel' && { color: theme.textSecondary, fontWeight: '500' },
+                                        option.style === 'destructive' && { color: '#FF3B30' },
                                     ]}
                                 >
                                     {option.text}
@@ -60,65 +89,111 @@ export default function CustomAlert({ visible, title, message, options, onClose 
     );
 }
 
+// ─── Shared themed button used across the app ─────────────────────────────────
+
+interface AppButtonProps {
+    label: string;
+    onPress: () => void;
+    variant?: 'primary' | 'secondary' | 'destructive' | 'ghost';
+    disabled?: boolean;
+    icon?: React.ReactNode;
+    style?: object;
+}
+
+export function AppButton({ label, onPress, variant = 'primary', disabled, icon, style }: AppButtonProps) {
+    const { theme } = useTheme();
+
+    const bgColor = {
+        primary: theme.primary,
+        secondary: theme.card,
+        destructive: '#FF3B30',
+        ghost: 'transparent',
+    }[variant];
+
+    const textColor = {
+        primary: '#FFFFFF',
+        secondary: theme.text,
+        destructive: '#FFFFFF',
+        ghost: theme.primary,
+    }[variant];
+
+    return (
+        <TouchableOpacity
+            activeOpacity={0.8}
+            onPress={onPress}
+            disabled={disabled}
+            style={[
+                styles.appButton,
+                { backgroundColor: bgColor },
+                variant === 'secondary' && { borderWidth: 1, borderColor: theme.border },
+                disabled && { opacity: 0.5 },
+                style,
+            ]}
+        >
+            {icon}
+            <Text style={[styles.appButtonText, { color: textColor }]}>{label}</Text>
+        </TouchableOpacity>
+    );
+}
+
 const styles = StyleSheet.create({
     overlay: {
         flex: 1,
-        backgroundColor: 'rgba(0, 0, 0, 0.7)',
+        backgroundColor: 'rgba(0,0,0,0.55)',
         justifyContent: 'center',
         alignItems: 'center',
-        padding: 20,
+        padding: 32,
     },
     container: {
-        backgroundColor: '#1C1C1E',
-        borderRadius: 24,
         width: '100%',
-        maxWidth: 340,
-        overflow: 'hidden',
+        maxWidth: 360,
+        borderRadius: 24,
         borderWidth: 1,
-        borderColor: '#2C2C2E',
+        overflow: 'hidden',
     },
     header: {
-        padding: 24,
+        paddingHorizontal: 24,
+        paddingTop: 28,
+        paddingBottom: 20,
         alignItems: 'center',
+        gap: 8,
     },
     title: {
-        fontSize: 20,
+        fontSize: 18,
         fontWeight: '700',
-        color: '#FFF',
-        marginBottom: 8,
         textAlign: 'center',
     },
     message: {
         fontSize: 14,
-        color: '#8E8E93',
+        fontWeight: '400',
         textAlign: 'center',
         lineHeight: 20,
     },
-    buttonContainer: {
-        borderTopWidth: 1,
-        borderTopColor: '#2C2C2E',
+    divider: {
+        height: 1,
     },
+    buttonContainer: {},
     button: {
-        padding: 16,
+        paddingVertical: 18,
         alignItems: 'center',
-        borderBottomWidth: 1,
-        borderBottomColor: '#2C2C2E',
-    },
-    cancelButton: {
-        backgroundColor: '#2C2C2E',
-    },
-    destructiveButton: {
-        backgroundColor: 'rgba(255, 59, 48, 0.1)',
+        justifyContent: 'center',
     },
     buttonText: {
         fontSize: 16,
-        fontWeight: '600',
-        color: '#FFD60A',
+        fontWeight: '700',
     },
-    cancelText: {
-        color: '#8E8E93',
+    // Shared AppButton
+    appButton: {
+        height: 56,
+        borderRadius: 28,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 8,
+        paddingHorizontal: 24,
     },
-    destructiveText: {
-        color: '#FF3B30',
+    appButtonText: {
+        fontSize: 16,
+        fontWeight: '700',
     },
 });

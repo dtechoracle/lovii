@@ -84,8 +84,11 @@ export default function ConnectScreen() {
 
             if (!result.canceled && result.assets[0]) {
                 const uri = result.assets[0].uri;
-                setAvatarUri(uri);
+                setAvatarUri(uri); // Show immediately
                 await StorageService.updateAvatar(uri);
+                // Re-read profile to get Cloudinary URL if upload finished
+                const updated = await StorageService.getProfile();
+                if (updated?.avatarUri) setAvatarUri(updated.avatarUri);
             }
         } catch (error) {
             console.error('Image picker error:', error);
@@ -234,33 +237,42 @@ export default function ConnectScreen() {
         }
     };
 
-    const handleLogout = async () => {
-        Alert.alert("Log Out?", "You will return to the login screen.", [
-            { text: "Cancel", style: "cancel" },
-            {
-                text: "Log Out",
-                style: "destructive",
-                onPress: async () => {
-                    await AuthService.logout();
-                    router.replace('/auth/login');
+    const handleLogout = () => {
+        setAlertConfig({
+            visible: true,
+            title: 'Log Out?',
+            message: 'You will return to the login screen.',
+            options: [
+                { text: 'Cancel', onPress: () => { }, style: 'cancel' },
+                {
+                    text: 'Log Out',
+                    onPress: async () => {
+                        await AuthService.logout();
+                        router.replace('/auth/login');
+                    },
+                    style: 'destructive'
                 }
-            }
-        ]);
+            ]
+        });
     };
 
-    const handleReset = async () => {
-        Alert.alert("Reset App?", "This will clear all data locally. Your account still exists on the server.", [
-            { text: "Cancel", style: "cancel" },
-            {
-                text: "Reset",
-                style: "destructive",
-                onPress: async () => {
-                    await StorageService.clearAll();
-                    router.replace('/(tabs)'); // Or login?
-                    router.replace('/auth/login');
+    const handleReset = () => {
+        setAlertConfig({
+            visible: true,
+            title: 'Reset App?',
+            message: 'This will clear all data locally. Your account still exists on the server.',
+            options: [
+                { text: 'Cancel', onPress: () => { }, style: 'cancel' },
+                {
+                    text: 'Reset',
+                    onPress: async () => {
+                        await StorageService.clearAll();
+                        router.replace('/auth/login');
+                    },
+                    style: 'destructive'
                 }
-            }
-        ]);
+            ]
+        });
     };
 
     // Helper for input styles

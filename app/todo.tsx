@@ -1,3 +1,4 @@
+import CustomAlert from '@/components/CustomAlert';
 import ScreenHeader from '@/components/ScreenHeader';
 import OutlinedCard from '@/components/ui/OutlinedCard';
 import { useTheme } from '@/context/ThemeContext';
@@ -5,7 +6,7 @@ import { StorageService, Task } from '@/services/storage';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { Alert, FlatList, KeyboardAvoidingView, Platform, StatusBar, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { FlatList, KeyboardAvoidingView, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
 export default function TodoScreen() {
     const router = useRouter();
@@ -14,6 +15,19 @@ export default function TodoScreen() {
     const [newTask, setNewTask] = useState('');
     const [selectedTasks, setSelectedTasks] = useState<Set<string>>(new Set());
     const [isSelectionMode, setIsSelectionMode] = useState(false);
+    const [alertConfig, setAlertConfig] = useState<{
+        visible: boolean;
+        title: string;
+        message?: string;
+        options: { text: string; onPress: () => void; style?: 'default' | 'cancel' | 'destructive' }[];
+    }>({ visible: false, title: '', options: [] });
+
+    const showAlert = (title: string, message: string, okText = 'OK') => {
+        setAlertConfig({
+            visible: true, title, message,
+            options: [{ text: okText, onPress: () => { }, style: 'cancel' }]
+        });
+    };
 
     useEffect(() => {
         loadTasks();
@@ -75,11 +89,11 @@ export default function TodoScreen() {
 
         const result = await StorageService.sendTasksToWidget(tasksToSend);
         if (result.success) {
-            Alert.alert("Sent!", `${tasksToSend.length} tasks are now on your partner's widget! 🚀`);
+            showAlert('Sent! 🚀', `${tasksToSend.length} task${tasksToSend.length > 1 ? 's' : ''} sent to your partner's widget!`);
             setIsSelectionMode(false);
             setSelectedTasks(new Set());
         } else {
-            Alert.alert("Error", result.error || "Failed to send to widget.");
+            showAlert('Error', result.error || 'Failed to send to widget.');
         }
     };
 
@@ -142,12 +156,11 @@ export default function TodoScreen() {
                     {!isSelectionMode && (
                         <View style={styles.itemRight}>
                             <TouchableOpacity style={styles.widgetBtn} onPress={async () => {
-                                // Fallback for single task send
                                 const result = await StorageService.sendTasksToWidget([item]);
                                 if (result.success) {
-                                    Alert.alert("Sent!", "This task is now on your partner's widget! 🚀");
+                                    showAlert('Sent! 🚀', "Task sent to your partner's widget!");
                                 } else {
-                                    Alert.alert("Error", result.error || "Failed to send to widget.");
+                                    showAlert('Error', result.error || 'Failed to send to widget.');
                                 }
                             }}>
                                 <Ionicons name="share-outline" size={20} color={theme.primary} />
@@ -167,7 +180,6 @@ export default function TodoScreen() {
             behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
             style={[styles.container, { backgroundColor: theme.background }]}
         >
-            <StatusBar barStyle="dark-content" />
 
             <View style={styles.headerRow}>
                 <ScreenHeader title={isSelectionMode ? `${selectedTasks.size} Selected` : "Tasks"} showBack />
@@ -196,7 +208,7 @@ export default function TodoScreen() {
             {isSelectionMode ? (
                 <View style={styles.selectionFooter}>
                     <TouchableOpacity
-                        style={[styles.sendMultipleBtn, selectedTasks.size === 0 && { opacity: 0.5 }]}
+                        style={[styles.sendMultipleBtn, { backgroundColor: theme.primary }, selectedTasks.size === 0 && { opacity: 0.5 }]}
                         disabled={selectedTasks.size === 0}
                         onPress={sendSelectedToWidget}
                     >
@@ -206,23 +218,32 @@ export default function TodoScreen() {
                 </View>
             ) : (
                 <View style={styles.inputContainer}>
-                    <View style={styles.inputWrapper}>
+                    <View style={[styles.inputWrapper, { backgroundColor: theme.card }]}>
                         <TextInput
-                            style={[styles.input, { outlineStyle: 'none' } as any]}
+                            style={[styles.input, { color: theme.text, outlineStyle: 'none' } as any]}
                             placeholder="Add a new task..."
-                            placeholderTextColor="#8E8E93"
+                            placeholderTextColor={theme.textSecondary}
                             value={newTask}
                             onChangeText={setNewTask}
                             onSubmitEditing={handleAddTask}
                             autoCapitalize="sentences"
                             autoCorrect={true}
+                            underlineColorAndroid="transparent"
                         />
-                        <TouchableOpacity style={styles.addBtn} onPress={handleAddTask}>
+                        <TouchableOpacity style={[styles.addBtn, { backgroundColor: theme.primary }]} onPress={handleAddTask}>
                             <Ionicons name="arrow-up" size={20} color="#FFF" />
                         </TouchableOpacity>
                     </View>
                 </View>
             )}
+
+            <CustomAlert
+                visible={alertConfig.visible}
+                title={alertConfig.title}
+                message={alertConfig.message}
+                options={alertConfig.options}
+                onClose={() => setAlertConfig(prev => ({ ...prev, visible: false }))}
+            />
         </KeyboardAvoidingView>
     );
 }
@@ -321,12 +342,10 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         paddingHorizontal: 16,
         paddingVertical: 8,
-        backgroundColor: '#FFFFFF',
         borderRadius: 32,
     },
     input: {
         flex: 1,
-        color: '#1C1C1E',
         fontSize: 16,
         fontWeight: '600',
         paddingVertical: 8,
@@ -369,12 +388,11 @@ const styles = StyleSheet.create({
         backgroundColor: 'transparent',
     },
     sendMultipleBtn: {
-        backgroundColor: '#4B6EFF',
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
         padding: 16,
-        borderRadius: 24,
+        borderRadius: 28,
         gap: 8,
     },
     sendMultipleText: {
