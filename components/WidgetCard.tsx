@@ -2,7 +2,8 @@ import { useTheme } from '@/context/ThemeContext';
 import { Note, StorageService } from '@/services/storage';
 import { Ionicons } from '@expo/vector-icons';
 import React, { useState } from 'react';
-import { Alert, Dimensions, Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Dimensions, Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import CustomAlert from './CustomAlert';
 import DrawingViewer from './DrawingViewer';
 import NoteOptions from './NoteOptions';
 import OutlinedCard from './ui/OutlinedCard';
@@ -23,6 +24,11 @@ export default function WidgetCard({ note, onPress, partnerName = 'Partner', myU
     const { theme, isDark } = useTheme();
     const isMyNote = note?.userId === myUserId;
     const [optionsVisible, setOptionsVisible] = useState(false);
+    const [alertConfig, setAlertConfig] = useState<{
+        title: string;
+        message?: string;
+        options: { text: string; onPress: () => void; style?: 'default' | 'cancel' | 'destructive' }[];
+    } | null>(null);
 
     // Dynamic styles for Dark Mode inverse
     const cardBackgroundColor = isDark ? '#1C1C1E' : theme.card; // Dark grey in dark mode, card color (white) in light
@@ -33,21 +39,22 @@ export default function WidgetCard({ note, onPress, partnerName = 'Partner', myU
 
     const handleAction = async (action: 'pin' | 'bookmark' | 'widget' | 'delete', selectedNote: Note) => {
         if (action === 'delete') {
-            Alert.alert(
-                "Delete Note",
-                "Are you sure you want to delete this note?",
-                [
-                    { text: "Cancel", style: "cancel" },
+            setAlertConfig({
+                title: "Delete Note",
+                message: "Are you sure you want to delete this note?",
+                options: [
+                    { text: "Cancel", style: "cancel", onPress: () => setAlertConfig(null) },
                     {
                         text: "Delete",
                         style: "destructive",
                         onPress: async () => {
                             await StorageService.deleteNote(selectedNote.id);
                             onNoteUpdate?.();
+                            setAlertConfig(null);
                         }
                     }
                 ]
-            );
+            });
         } else if (action === 'pin') {
             await StorageService.togglePin(selectedNote.id, selectedNote.pinned || false);
             onNoteUpdate?.();
@@ -55,8 +62,14 @@ export default function WidgetCard({ note, onPress, partnerName = 'Partner', myU
             await StorageService.toggleBookmark(selectedNote.id, selectedNote.bookmarked || false);
             onNoteUpdate?.();
         } else if (action === 'widget') {
-            await StorageService.sendToPartnerWidget(selectedNote);
-            Alert.alert("Sent!", "This note will appear on your partner's widget soon!");
+            const resentNote = { ...selectedNote, id: Date.now().toString(), timestamp: Date.now() };
+            await StorageService.sendToPartnerWidget(resentNote);
+            setAlertConfig({
+                title: "Sent!",
+                message: "This note will appear on your partner's widget soon!",
+                options: [{ text: "OK", style: "default", onPress: () => setAlertConfig(null) }]
+            });
+            onNoteUpdate?.();
         }
     };
 
@@ -290,6 +303,16 @@ export default function WidgetCard({ note, onPress, partnerName = 'Partner', myU
                     onClose={() => setOptionsVisible(false)}
                     note={note}
                     onAction={handleAction}
+                />
+            )}
+
+            {alertConfig && (
+                <CustomAlert
+                    visible={!!alertConfig}
+                    title={alertConfig.title}
+                    message={alertConfig.message}
+                    options={alertConfig.options}
+                    onClose={() => setAlertConfig(null)}
                 />
             )}
         </>

@@ -1,9 +1,10 @@
 import { useTheme } from '@/context/ThemeContext';
 import { Ionicons } from '@expo/vector-icons';
 import React, { useRef, useState } from 'react';
-import { ActionSheetIOS, Alert, Image, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Image, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import ViewShot from 'react-native-view-shot';
 import Canvas, { PathData } from './Canvas';
+import CustomAlert from './CustomAlert';
 import MusicPicker from './MusicPicker';
 import ScreenHeader from './ScreenHeader';
 import OutlinedCard from './ui/OutlinedCard';
@@ -90,6 +91,11 @@ export default function NoteEditor({ onSend, onCancel, isSending = false }: Note
     const [isItalic, setIsItalic] = useState(false);
     const [isUnderline, setIsUnderline] = useState(false);
     const [showSendOptions, setShowSendOptions] = useState(false);
+    const [alertConfig, setAlertConfig] = useState<{
+        title: string;
+        message?: string;
+        options: { text: string; onPress: () => void; style?: 'default' | 'cancel' | 'destructive' }[];
+    } | null>(null);
     const viewShotRef = useRef<ViewShot>(null);
 
     const handleUndo = () => {
@@ -104,35 +110,15 @@ export default function NoteEditor({ onSend, onCancel, isSending = false }: Note
     };
 
     const showSendOptionsMenu = () => {
-        if (Platform.OS === 'ios') {
-            ActionSheetIOS.showActionSheetWithOptions(
-                {
-                    options: ['Cancel', 'Save Locally', 'Send to Partner\'s Widget'],
-                    cancelButtonIndex: 0,
-                },
-                (buttonIndex) => {
-                    if (buttonIndex === 1) {
-                        // Save locally
-                        executeSend(false);
-                    } else if (buttonIndex === 2) {
-                        // Send to partner's widget
-                        executeSend(true);
-                    }
-                }
-            );
-        } else {
-            // Android - use Alert with buttons
-            Alert.alert(
-                'How would you like to send this note?',
-                'Choose where to save your note',
-                [
-                    { text: 'Cancel', style: 'cancel' },
-                    { text: 'Save Locally', onPress: () => executeSend(false) },
-                    { text: 'Send to Partner\'s Widget', onPress: () => executeSend(true) },
-                ],
-                { cancelable: true }
-            );
-        }
+        setAlertConfig({
+            title: 'How would you like to send this note?',
+            message: 'Choose where to save your note',
+            options: [
+                { text: 'Cancel', style: 'cancel', onPress: () => setAlertConfig(null) },
+                { text: 'Save Locally', onPress: () => { setAlertConfig(null); executeSend(false); } },
+                { text: 'Send to Partner\'s Widget', onPress: () => { setAlertConfig(null); executeSend(true); } },
+            ]
+        });
     };
 
     const executeSend = async (sendToWidget: boolean) => {
@@ -145,7 +131,11 @@ export default function NoteEditor({ onSend, onCancel, isSending = false }: Note
             });
         } else if (mode === 'music') {
             if (!selectedTrack) {
-                Alert.alert('No Song Selected', 'Please pick a song first!');
+                setAlertConfig({
+                    title: 'No Song Selected',
+                    message: 'Please pick a song first!',
+                    options: [{ text: 'OK', style: 'default', onPress: () => setAlertConfig(null) }]
+                });
                 return;
             }
             // Pass the track data as part of the specialized onSend call or handle it differently
@@ -440,6 +430,16 @@ export default function NoteEditor({ onSend, onCancel, isSending = false }: Note
                     ))}
                 </ScrollView>
             </View>
+
+            {alertConfig && (
+                <CustomAlert
+                    visible={!!alertConfig}
+                    title={alertConfig.title}
+                    message={alertConfig.message}
+                    options={alertConfig.options}
+                    onClose={() => setAlertConfig(null)}
+                />
+            )}
         </KeyboardAvoidingView>
     );
 }

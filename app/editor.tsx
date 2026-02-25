@@ -1,12 +1,19 @@
+import CustomAlert from '@/components/CustomAlert';
 import NoteEditor from '@/components/NoteEditor';
 import { Note, StorageService } from '@/services/storage';
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
-import { Alert, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
 export default function EditorScreen() {
     const router = useRouter();
     const [isSending, setIsSending] = useState(false);
+    const [alertConfig, setAlertConfig] = useState<{
+        visible: boolean;
+        title: string;
+        message?: string;
+        options: { text: string; onPress: () => void; style?: 'default' | 'cancel' | 'destructive' }[];
+    } | null>(null);
 
     const handleSend = async (
         content: string,
@@ -48,11 +55,12 @@ export default function EditorScreen() {
                 const result = await StorageService.sendToPartnerWidget(newNote);
 
                 if (!result.success) {
-                    Alert.alert(
-                        'Failed to Send',
-                        result.error || 'Could not send to partner\'s widget',
-                        [{ text: 'OK' }]
-                    );
+                    setAlertConfig({
+                        visible: true,
+                        title: 'Failed to Send',
+                        message: result.error || 'Could not send to partner\'s widget',
+                        options: [{ text: 'OK', onPress: () => { setAlertConfig(prev => prev ? { ...prev, visible: false } : null) } }]
+                    });
                     setIsSending(false);
                     return;
                 }
@@ -69,11 +77,17 @@ export default function EditorScreen() {
                     }
                 }
 
-                Alert.alert(
-                    '✅ Sent!',
+                setAlertConfig({
+                    visible: true,
+                    title: '✅ Sent!',
                     message,
-                    [{ text: 'OK', onPress: () => router.back() }]
-                );
+                    options: [{
+                        text: 'OK', onPress: () => {
+                            setAlertConfig(prev => prev ? { ...prev, visible: false } : null);
+                            router.back();
+                        }
+                    }]
+                });
             } else {
                 // Just save locally
                 await StorageService.saveMyNote(newNote);
@@ -81,7 +95,12 @@ export default function EditorScreen() {
             }
         } catch (error) {
             console.error('Error sending note:', error);
-            Alert.alert('Error', 'Something went wrong. Please try again.');
+            setAlertConfig({
+                visible: true,
+                title: 'Error',
+                message: 'Something went wrong. Please try again.',
+                options: [{ text: 'OK', onPress: () => { setAlertConfig(prev => prev ? { ...prev, visible: false } : null) } }]
+            });
         } finally {
             setIsSending(false);
         }
@@ -94,6 +113,16 @@ export default function EditorScreen() {
                 onCancel={() => router.back()}
                 isSending={isSending}
             />
+
+            {alertConfig && (
+                <CustomAlert
+                    visible={alertConfig.visible}
+                    title={alertConfig.title}
+                    message={alertConfig.message}
+                    options={alertConfig.options}
+                    onClose={() => setAlertConfig(prev => prev ? { ...prev, visible: false } : null)}
+                />
+            )}
         </View>
     );
 }

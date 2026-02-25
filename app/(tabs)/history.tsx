@@ -9,7 +9,6 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import React, { useCallback, useState } from 'react';
 import {
-    Alert,
     Image,
     RefreshControl,
     SafeAreaView,
@@ -131,21 +130,23 @@ export default function HistoryScreen() {
 
     const handleAction = async (action: 'pin' | 'bookmark' | 'widget' | 'delete', note: Note) => {
         if (action === 'delete') {
-            Alert.alert(
-                "Delete Note",
-                "Are you sure you want to delete this note?",
-                [
-                    { text: "Cancel", style: "cancel" },
+            setAlertConfig({
+                visible: true,
+                title: "Delete Note",
+                message: "Are you sure you want to delete this note?",
+                options: [
+                    { text: "Cancel", style: "cancel", onPress: () => { setAlertConfig(prev => ({ ...prev, visible: false })) } },
                     {
                         text: "Delete",
                         style: "destructive",
                         onPress: async () => {
                             await StorageService.deleteNote(note.id);
                             await loadHistory();
+                            setAlertConfig(prev => ({ ...prev, visible: false }));
                         }
                     }
                 ]
-            );
+            });
         } else if (action === 'pin') {
             await StorageService.togglePin(note.id, note.pinned || false);
             await loadHistory();
@@ -176,8 +177,12 @@ export default function HistoryScreen() {
                 return;
             }
 
-            const result = await StorageService.sendToPartnerWidget(note);
+            // Resend means create a new note with the same properties but a new ID and timestamp
+            // so it becomes the new active (latest) note for the widget and history timeline
+            const resentNote = { ...note, id: Date.now().toString(), timestamp: Date.now() };
+            const result = await StorageService.sendToPartnerWidget(resentNote);
             if (result.success) {
+                await loadHistory();
                 setAlertConfig({
                     visible: true,
                     title: 'Sent!',

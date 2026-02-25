@@ -1,3 +1,4 @@
+import CustomAlert from '@/components/CustomAlert';
 import DrawingViewer from '@/components/DrawingViewer';
 import NoteOptions from '@/components/NoteOptions';
 import ScreenHeader from '@/components/ScreenHeader';
@@ -7,7 +8,7 @@ import { Note, StorageService } from '@/services/storage';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { Alert, FlatList, Image, Platform, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { FlatList, Image, Platform, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function HistoryScreen() {
@@ -22,6 +23,21 @@ export default function HistoryScreen() {
     const [history, setHistory] = useState<Note[]>([]);
     const [selectedNote, setSelectedNote] = useState<Note | null>(null);
     const [optionsVisible, setOptionsVisible] = useState(false);
+    const [alertVisible, setAlertVisible] = useState(false);
+    const [alertConfig, setAlertConfig] = useState<{
+        title: string;
+        message?: string;
+        options: { text: string; onPress: () => void; style?: 'default' | 'cancel' | 'destructive' }[];
+    } | null>(null);
+
+    const showAlert = (title: string, message?: string, options?: any[]) => {
+        setAlertConfig({
+            title,
+            message,
+            options: options || [{ text: 'OK', onPress: () => { } }]
+        });
+        setAlertVisible(true);
+    };
 
     useEffect(() => {
         loadHistory();
@@ -39,11 +55,11 @@ export default function HistoryScreen() {
 
     const handleAction = async (action: 'pin' | 'bookmark' | 'widget' | 'delete', note: Note) => {
         if (action === 'delete') {
-            Alert.alert(
+            showAlert(
                 "Delete Note",
                 "Are you sure you want to delete this note?",
                 [
-                    { text: "Cancel", style: "cancel" },
+                    { text: "Cancel", style: "cancel", onPress: () => { } },
                     {
                         text: "Delete",
                         style: "destructive",
@@ -61,8 +77,15 @@ export default function HistoryScreen() {
             await StorageService.toggleBookmark(note.id, note.bookmarked || false);
             loadHistory();
         } else if (action === 'widget') {
-            await StorageService.sendToPartnerWidget(note);
-            Alert.alert("Widget Updated", "This note is now shown on your widget!");
+            // Re-send means creating a new note with the same content but updated timestamp so it rises to the top
+            const resentNote = { ...note, id: Date.now().toString(), timestamp: Date.now() };
+            const result = await StorageService.sendToPartnerWidget(resentNote);
+            if (result.success) {
+                showAlert("Widget Updated", "This note is now shown on your widget!");
+                loadHistory();
+            } else {
+                showAlert("Failed", result.error || "Could not resend this note to widget.");
+            }
         }
     };
 
@@ -178,6 +201,16 @@ export default function HistoryScreen() {
                 note={selectedNote}
                 onAction={handleAction}
             />
+
+            {alertConfig && (
+                <CustomAlert
+                    visible={alertVisible}
+                    title={alertConfig.title}
+                    message={alertConfig.message}
+                    options={alertConfig.options}
+                    onClose={() => setAlertVisible(false)}
+                />
+            )}
         </View>
     );
 }
