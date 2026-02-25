@@ -325,68 +325,103 @@ export default function ConnectScreen() {
                     <ThemedText style={[styles.hint, { color: theme.textSecondary }]}>Give this code to your partner to connect</ThemedText>
                 </OutlinedCard>
 
-                <View style={[styles.divider, { marginVertical: 20 }]}>
-                    <View style={[styles.line, { backgroundColor: theme.border }]} />
-                    <ThemedText style={[styles.or, { color: theme.textSecondary }]}>Connection</ThemedText>
-                    <View style={[styles.line, { backgroundColor: theme.border }]} />
-                </View>
-
-                <OutlinedCard style={[styles.card, { backgroundColor: theme.card, borderColor: theme.border }]}>
-                    <ThemedText type="subtitle" style={[styles.label, { color: theme.textSecondary }]}>Partner Code</ThemedText>
-                    <TextInput
-                        style={[styles.input, inputStyle, { marginBottom: 16 }]}
-                        placeholder="Ex. X7Y2Z9"
-                        placeholderTextColor={theme.textSecondary}
-                        value={code}
-                        onChangeText={(t) => setCode(t.toUpperCase())}
-                        maxLength={12}
-                        underlineColorAndroid="transparent"
-                    />
-
-                    <ThemedText type="subtitle" style={[styles.label, { color: theme.textSecondary }]}>Partner Name</ThemedText>
-                    <TextInput
-                        style={[styles.input, inputStyle]}
-                        placeholder="My Love"
-                        placeholderTextColor={theme.textSecondary}
-                        value={partnerName}
-                        onChangeText={setPartnerName}
-                        autoCapitalize="words"
-                        autoCorrect={true}
-                        underlineColorAndroid="transparent"
-                    />
-
-                    {connectionStatus === 'connected' ? (
-                        <View style={styles.connectedBadge}>
-                            <Ionicons name="checkmark-circle" size={16} color="#34C759" />
-                            <ThemedText style={styles.connectedText}>Connected to {profile?.partnerName || 'Partner'}</ThemedText>
-
+                {/* ─── Partner Connection ─── */}
+                <OutlinedCard style={[styles.card, { backgroundColor: theme.card }]}>
+                    <View style={styles.sectionHeader}>
+                        <View style={[styles.sectionIconBg, { backgroundColor: theme.primary + '20' }]}>
+                            <Ionicons name="heart" size={18} color={theme.primary} />
+                        </View>
+                        <View style={{ flex: 1 }}>
+                            <ThemedText type="subtitle" style={[styles.label, { color: theme.textSecondary }]}>
+                                Connect
+                            </ThemedText>
+                            {connectionStatus === 'connected' && (
+                                <View style={styles.connectedPill}>
+                                    <View style={styles.connectedDot} />
+                                    <Text style={styles.connectedPillText}>
+                                        Connected to {profile?.partnerName || 'Partner'}
+                                    </Text>
+                                </View>
+                            )}
+                        </View>
+                        {connectionStatus === 'connected' && (
                             <TouchableOpacity
-                                style={[styles.disconnectIcon, { marginLeft: 'auto' }]}
                                 onPress={() => handleDisconnect(profile?.connectedPartnerId || '', profile?.partnerName || '')}
+                                style={[styles.disconnectChip, { borderColor: '#FF3B3040' }]}
                             >
-                                <Ionicons name="close-circle" size={20} color="#FF3B30" />
+                                <Ionicons name="close" size={14} color="#FF3B30" />
+                                <Text style={styles.disconnectChipText}>Disconnect</Text>
                             </TouchableOpacity>
+                        )}
+                    </View>
+
+                    {/* Partner Code Field */}
+                    <View style={styles.fieldGroup}>
+                        <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>PARTNER CODE</Text>
+                        <View style={[styles.fieldBox, { backgroundColor: theme.background, borderColor: code ? theme.primary + '60' : theme.border }]}>
+                            <Ionicons name="link-outline" size={18} color={code ? theme.primary : theme.textSecondary} />
+                            <TextInput
+                                style={[styles.fieldInput, { color: theme.text }]}
+                                placeholder="LOVII-XXXXXX"
+                                placeholderTextColor={theme.textSecondary + '80'}
+                                value={code}
+                                onChangeText={(t) => setCode(t.toUpperCase())}
+                                maxLength={12}
+                                autoCapitalize="characters"
+                                underlineColorAndroid="transparent"
+                                selectionColor={theme.primary}
+                            />
+                            {code.length > 0 && (
+                                <TouchableOpacity onPress={() => setCode('')}>
+                                    <Ionicons name="close-circle" size={18} color={theme.textSecondary} />
+                                </TouchableOpacity>
+                            )}
                         </View>
-                    ) : connectionStatus === 'connecting' ? (
-                        <View style={styles.notConnectedBadge}>
-                            <Ionicons name="sync" size={16} color="#007AFF" />
-                            <ThemedText style={[styles.notConnectedText, { color: '#007AFF' }]}>Connecting...</ThemedText>
+                    </View>
+
+                    {/* Partner Name Field */}
+                    <View style={[styles.fieldGroup, { marginBottom: 20 }]}>
+                        <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>PARTNER NAME</Text>
+                        <View style={[styles.fieldBox, { backgroundColor: theme.background, borderColor: partnerName ? theme.primary + '60' : theme.border }]}>
+                            <Ionicons name="person-outline" size={18} color={partnerName ? theme.primary : theme.textSecondary} />
+                            <TextInput
+                                style={[styles.fieldInput, { color: theme.text }]}
+                                placeholder="What do you call them?"
+                                placeholderTextColor={theme.textSecondary + '80'}
+                                value={partnerName}
+                                onChangeText={setPartnerName}
+                                autoCapitalize="words"
+                                autoCorrect={false}
+                                underlineColorAndroid="transparent"
+                                selectionColor={theme.primary}
+                            />
                         </View>
-                    ) : (
-                        <View style={styles.notConnectedBadge}>
-                            <Ionicons name="close-circle" size={16} color="#FF9500" />
-                            <ThemedText style={styles.notConnectedText}>Not Connected</ThemedText>
+                    </View>
+
+                    {/* Status badge for non-connected states */}
+                    {connectionStatus === 'connecting' && (
+                        <View style={[styles.statusBadge, { backgroundColor: '#007AFF15', marginBottom: 16 }]}>
+                            <Ionicons name="sync" size={14} color="#007AFF" />
+                            <Text style={[styles.statusBadgeText, { color: '#007AFF' }]}>Connecting...</Text>
+                        </View>
+                    )}
+                    {connectionStatus === 'failed' && (
+                        <View style={[styles.statusBadge, { backgroundColor: '#FF3B3015', marginBottom: 16 }]}>
+                            <Ionicons name="close-circle-outline" size={14} color="#FF3B30" />
+                            <Text style={[styles.statusBadgeText, { color: '#FF3B30' }]}>Connection failed. Try again.</Text>
                         </View>
                     )}
 
                     <TouchableOpacity
-                        style={[styles.button, isConnecting && styles.buttonDisabled, { backgroundColor: theme.primary }]}
+                        style={[styles.connectBtn, { backgroundColor: theme.primary }, isConnecting && { opacity: 0.6 }]}
                         onPress={handleConnect}
                         disabled={isConnecting}
+                        activeOpacity={0.85}
                     >
-                        <ThemedText style={styles.buttonText}>
-                            {isConnecting ? 'Connecting...' : 'Save Changes'}
-                        </ThemedText>
+                        <Ionicons name={connectionStatus === 'connected' ? 'save-outline' : 'heart'} size={18} color="#FFF" />
+                        <Text style={styles.connectBtnText}>
+                            {isConnecting ? 'Saving...' : connectionStatus === 'connected' ? 'Save Changes' : 'Connect'}
+                        </Text>
                     </TouchableOpacity>
                 </OutlinedCard>
 
@@ -597,5 +632,98 @@ const styles = StyleSheet.create({
         color: '#FF9500',
         fontSize: 14,
         fontWeight: '600',
+    },
+
+    // ─── Partner Connection Section (rebuilt) ───
+    sectionIconBg: {
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginRight: 10,
+    },
+    connectedPill: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 5,
+        marginTop: 2,
+    },
+    connectedDot: {
+        width: 7,
+        height: 7,
+        borderRadius: 4,
+        backgroundColor: '#34C759',
+    },
+    connectedPillText: {
+        fontSize: 12,
+        fontWeight: '600',
+        color: '#34C759',
+    },
+    disconnectChip: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+        paddingHorizontal: 10,
+        paddingVertical: 6,
+        borderRadius: 20,
+        borderWidth: 1,
+    },
+    disconnectChipText: {
+        fontSize: 12,
+        fontWeight: '600',
+        color: '#FF3B30',
+    },
+    fieldGroup: {
+        marginBottom: 14,
+    },
+    fieldLabel: {
+        fontSize: 11,
+        fontWeight: '700',
+        letterSpacing: 0.8,
+        marginBottom: 6,
+    },
+    fieldBox: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        borderRadius: 16,
+        borderWidth: 1.5,
+        paddingHorizontal: 14,
+        paddingVertical: 4,
+        gap: 10,
+    },
+    fieldInput: {
+        flex: 1,
+        height: 48,
+        fontSize: 16,
+        fontWeight: '600',
+        borderBottomWidth: 0,
+        borderWidth: 0,
+        padding: 0,
+    },
+    statusBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        paddingVertical: 10,
+        paddingHorizontal: 14,
+        borderRadius: 12,
+    },
+    statusBadgeText: {
+        fontSize: 13,
+        fontWeight: '600',
+    },
+    connectBtn: {
+        height: 56,
+        borderRadius: 28,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 8,
+    },
+    connectBtnText: {
+        color: '#FFF',
+        fontSize: 16,
+        fontWeight: '700',
     },
 });
