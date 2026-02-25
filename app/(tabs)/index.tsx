@@ -18,7 +18,8 @@ const PointsRing = ({ points, max = 10 }: { points: number; max?: number }) => {
   const strokeWidth = 2.5;
   const radius = (size - strokeWidth) / 2;
   const circumference = radius * 2 * Math.PI;
-  const progress = Math.min(points / max, 1);
+  // Ring drains as points are spent — capped between 0 and 1
+  const progress = max > 0 ? Math.min(Math.max(points / max, 0), 1) : 0;
   const strokeDashoffset = circumference - progress * circumference;
 
   return (
@@ -214,7 +215,7 @@ export default function HomeScreen() {
         </View>
         <Link href="/pricing" asChild>
           <TouchableOpacity style={[styles.iconButton, { backgroundColor: theme.card }]}>
-            <PointsRing points={profile?.points || 0} max={profile?.maxPoints || profile?.points || 1} />
+            <PointsRing points={profile?.points || 0} max={10} />
           </TouchableOpacity>
         </Link>
         <Link href="/connect" asChild>

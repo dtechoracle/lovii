@@ -10,8 +10,10 @@ import { Alert, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View 
 const costBreakdown = [
     { icon: '📝', label: 'Send a Note', cost: 1 },
     { icon: '🎨', label: 'Send a Drawing', cost: 1 },
+    { icon: '✅', label: 'Send Tasks to Widget', cost: 1 },
     { icon: '🖼️', label: 'Upload a Collage', cost: 2 },
     { icon: '🎵', label: 'Song Upload', cost: 2 },
+    { icon: '🔥', label: 'Restore Streak', cost: 5 },
 ];
 
 export default function PricingScreen() {
