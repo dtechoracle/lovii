@@ -13,7 +13,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function HistoryScreen() {
     const router = useRouter();
-    const { theme } = useTheme();
+    const { theme, isDark } = useTheme();
     const insets = useSafeAreaInsets();
 
     // Robust top padding: (SafeArea OR StatusBar) + extra buffer
@@ -77,14 +77,11 @@ export default function HistoryScreen() {
             await StorageService.toggleBookmark(note.id, note.bookmarked || false);
             loadHistory();
         } else if (action === 'widget') {
-            // Re-send means creating a new note with the same content but updated timestamp so it rises to the top
-            const resentNote = { ...note, id: Date.now().toString(), timestamp: Date.now() };
-            const result = await StorageService.sendToPartnerWidget(resentNote);
+            const result = await StorageService.pushExistingNoteToWidget(note.id);
             if (result.success) {
-                showAlert("Widget Updated", "This note is now shown on your widget!");
-                loadHistory();
+                showAlert("Widget Updated", "This note is now shown on your partner's widget!");
             } else {
-                showAlert("Failed", result.error || "Could not resend this note to widget.");
+                showAlert("Failed", result.error || "Could not push this note to widget.");
             }
         }
     };
@@ -95,9 +92,9 @@ export default function HistoryScreen() {
             onLongPress={() => handleOptions(item)}
             delayLongPress={500}
         >
-            <OutlinedCard style={styles.card} color="#FFFFFF">
+            <OutlinedCard style={[styles.card, { backgroundColor: theme.card, borderColor: theme.border }]} color={theme.card}>
                 <View style={styles.cardHeader}>
-                    <Text style={styles.date}>
+                    <Text style={[styles.date, { color: theme.textSecondary }]}>
                         {new Date(item.timestamp).toLocaleDateString()}
                     </Text>
                     <View style={styles.headerIcons}>
@@ -108,19 +105,19 @@ export default function HistoryScreen() {
                             <Ionicons
                                 name={item.type === 'drawing' ? 'brush' : item.type === 'collage' ? 'images' : item.type === 'music' ? 'musical-notes' : 'text'}
                                 size={12}
-                                color="#8E8E93"
+                                color={theme.textSecondary}
                             />
-                            <Text style={styles.typeText}>{item.type}</Text>
+                            <Text style={[styles.typeText, { color: theme.textSecondary }]}>{item.type}</Text>
                         </View>
                     </View>
                 </View>
 
                 {item.type === 'text' && (
-                    <Text style={styles.content}>{item.content}</Text>
+                    <Text style={[styles.content, { color: theme.text }]}>{item.content}</Text>
                 )}
 
                 {item.type === 'drawing' && (
-                    <View style={styles.imageContainer}>
+                    <View style={[styles.imageContainer, { backgroundColor: theme.background }]}>
                         {(() => {
                             try {
                                 const paths = JSON.parse(item.content);
@@ -128,7 +125,7 @@ export default function HistoryScreen() {
                                     <View style={{ flex: 1, width: '100%', height: '100%' }}>
                                         <DrawingViewer
                                             paths={paths}
-                                            color={item.color || '#1C1C1E'}
+                                            color={item.color || (isDark ? '#FFFFFF' : '#1C1C1E')} // Invert black/white based on theme
                                             width={300} // Approximate width, SVG scales
                                             height={120}
                                             strokeWidth={3}
@@ -136,7 +133,7 @@ export default function HistoryScreen() {
                                     </View>
                                 );
                             } catch (e) {
-                                return <Text style={styles.placeholderText}>Drawing Error</Text>;
+                                return <Text style={[styles.placeholderText, { color: theme.textSecondary }]}>Drawing Error</Text>;
                             }
                         })()}
                     </View>
@@ -153,31 +150,30 @@ export default function HistoryScreen() {
                 {item.type === 'music' && (
                     <View style={{ gap: 8 }}>
                         {item.musicTrack ? (
-                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: '#FFF', padding: 8, borderRadius: 16 }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: theme.card, padding: 8, borderRadius: 16 }}>
                                 <Image
                                     source={{ uri: item.musicTrack.coverUrl }}
-                                    style={{ width: 60, height: 60, borderRadius: 12, backgroundColor: '#EEE' }}
+                                    style={{ width: 60, height: 60, borderRadius: 12, backgroundColor: theme.background }}
                                 />
                                 <View style={{ flex: 1 }}>
-                                    <Text style={{ fontSize: 16, fontWeight: 'bold', color: '#1C1C1E' }} numberOfLines={1}>{item.musicTrack.title}</Text>
-                                    <Text style={{ fontSize: 14, color: '#8E8E93' }} numberOfLines={1}>{item.musicTrack.artist}</Text>
+                                    <Text style={{ fontSize: 16, fontWeight: 'bold', color: theme.text }} numberOfLines={1}>{item.musicTrack.title}</Text>
+                                    <Text style={{ fontSize: 14, color: theme.textSecondary }} numberOfLines={1}>{item.musicTrack.artist}</Text>
                                 </View>
                                 <Ionicons name="play-circle" size={32} color={theme.primary} />
                             </View>
                         ) : (
-                            <View style={{ padding: 10, backgroundColor: '#FFEBEE', borderRadius: 8 }}>
-                                <Text style={{ color: '#D32F2F', fontWeight: 'bold' }}>Broken Music Note</Text>
-                                <Text style={{ fontSize: 10, fontFamily: 'monospace' }}>{JSON.stringify(item, null, 2)}</Text>
+                            <View style={{ padding: 10, backgroundColor: theme.primary + '20', borderRadius: 8 }}>
+                                <Text style={{ color: theme.primary, fontWeight: 'bold' }}>Broken Music Note</Text>
                             </View>
                         )}
                     </View>
                 )}
             </OutlinedCard>
-        </TouchableOpacity>
+        </TouchableOpacity >
     );
 
     return (
-        <View style={[styles.container, { paddingTop: insets.top }]}>
+        <View style={[styles.container, { paddingTop: insets.top, backgroundColor: theme.background }]}>
             {/* <Text>Hello</Text> */}
             <View style={{ paddingTop: 10 }}>
                 <ScreenHeader title="Timeline" showBack />
@@ -240,7 +236,6 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     date: {
-        color: '#8E8E93',
         fontSize: 13,
         fontWeight: '600',
     },
@@ -251,23 +246,20 @@ const styles = StyleSheet.create({
         paddingVertical: 4,
         borderRadius: 8,
         gap: 4,
-        backgroundColor: '#F2F2F7',
+        // backgroundColor: '#F2F2F7', // Moved to inline style
     },
     typeText: {
         fontSize: 11,
         fontWeight: '600',
-        color: '#8E8E93',
         textTransform: 'capitalize',
     },
     content: {
-        color: '#1C1C1E',
         fontSize: 16,
         fontWeight: '500',
         lineHeight: 24,
     },
     imageContainer: {
         height: 120,
-        backgroundColor: '#F2F2F7',
         borderRadius: 16,
         alignItems: 'center',
         justifyContent: 'center',

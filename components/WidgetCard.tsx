@@ -86,8 +86,10 @@ export default function WidgetCard({ note, onPress, partnerName = 'Partner', myU
         }
 
         if (note.type === 'text') {
-            const isNoteColorDefault = note.color === '#FFFFFF' || !note.color;
-            const displayColor = (isDark && isNoteColorDefault) ? '#FFFFFF' : (note.color || textColor);
+            const isVeryDark = note.color === '#000000' || note.color === '#1C1C1E' || !note.color;
+            const displayColor = (isDark && isVeryDark) ? '#FFFFFF' :
+                (!isDark && note.color === '#FFFFFF') ? '#000000' :
+                    (note.color || textColor);
 
             return (
                 <View style={styles.textContent}>
@@ -131,8 +133,10 @@ export default function WidgetCard({ note, onPress, partnerName = 'Partner', myU
             // Render SVG paths first (ensures transparency for dark mode)
             if (paths.length > 0) {
                 // If note color is black/default and we are in dark mode, use white (textColor)
-                const isNoteColorDefault = note.color === '#000000' || note.color === '#FFFFFF' || !note.color;
-                const drawingColor = (isDark && isNoteColorDefault) ? '#FFFFFF' : (note.color || textColor);
+                const isVeryDark = note.color === '#000000' || note.color === '#1C1C1E' || !note.color;
+                const drawingColor = (isDark && isVeryDark) ? '#FFFFFF' :
+                    (!isDark && note.color === '#FFFFFF') ? '#000000' :
+                        (note.color || textColor);
 
                 return (
                     <View style={styles.drawingContent}>

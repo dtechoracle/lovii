@@ -12,17 +12,15 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 export default function RootLayout() {
   const colorScheme = useColorScheme();
 
-  // Initialize partner notes subscription for widget updates
+  // Setup Notifications and Partner Notes
   useEffect(() => {
-    console.log('[RootLayout] Starting partner notes subscription...');
+    console.log('[RootLayout] Starting services...');
 
-    // Force immediate widget update on app start to fix "preview image" issue
+    // Force immediate widget update on app start
     StorageService.updateWidget();
 
-    // Setup Notifications
     const cleanupNotifications = NotificationService.setupNotificationListeners();
 
-    // Get and save Token
     NotificationService.registerForPushNotificationsAsync().then(token => {
       if (token) {
         StorageService.savePushToken(token);
@@ -30,15 +28,19 @@ export default function RootLayout() {
     });
 
     const subscription = StorageService.subscribeToPartnerNotes((note) => {
-      console.log('[RootLayout] New partner note received:', note.type, note.timestamp);
+      console.log('[RootLayout] New partner note received:', note.type);
     });
 
     return () => {
-      console.log('[RootLayout] Cleaning up partner notes subscription');
       subscription.unsubscribe();
       cleanupNotifications();
     };
   }, []);
+
+  // Update widget when system theme changes
+  useEffect(() => {
+    StorageService.updateWidget();
+  }, [colorScheme]);
 
   return (
     <SafeAreaProvider>

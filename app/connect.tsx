@@ -4,7 +4,6 @@ import { ThemedText } from '@/components/themed-text';
 import ThemePickerModal from '@/components/ThemePickerModal';
 import OutlinedCard from '@/components/ui/OutlinedCard';
 import { useTheme } from '@/context/ThemeContext';
-import { AuthService } from '@/services/auth';
 import { StorageService, UserProfile } from '@/services/storage';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
@@ -162,13 +161,17 @@ export default function ConnectScreen() {
                     return;
                 }
 
-                // Success! Force a fresh sync directly to ensure state is updated
+                // Success!
+                setConnectionStatus('connected');
+
+                // Force a fresh sync directly to ensure state is fully updated from server
                 const userId = profile.id;
                 const latest = await StorageService.syncProfile(userId);
                 if (latest) {
                     setProfile(latest);
-                    setConnectionStatus('connected');
-                    setCode(''); // Clear input on success
+                    if (latest.connectedPartnerCode) {
+                        setCode(latest.connectedPartnerCode);
+                    }
                 }
 
                 setAlertConfig({
@@ -247,7 +250,7 @@ export default function ConnectScreen() {
                 {
                     text: 'Log Out',
                     onPress: async () => {
-                        await AuthService.logout();
+                        await StorageService.clearSession();
                         router.replace('/auth/login');
                     },
                     style: 'destructive'
@@ -266,7 +269,7 @@ export default function ConnectScreen() {
                 {
                     text: 'Reset',
                     onPress: async () => {
-                        await StorageService.clearAll();
+                        await StorageService.clearSession();
                         router.replace('/auth/login');
                     },
                     style: 'destructive'
@@ -364,7 +367,8 @@ export default function ConnectScreen() {
                                 style={[styles.fieldInput, { color: theme.text }]}
                                 placeholder="LOVII-XXXXXX"
                                 placeholderTextColor={theme.textSecondary + '80'}
-                                value={code}
+                                value={code || profile?.connectedPartnerCode || ''}
+                                editable={connectionStatus !== 'connected'} // Disable editing if already connected
                                 onChangeText={(t) => setCode(t.toUpperCase())}
                                 maxLength={12}
                                 autoCapitalize="characters"
@@ -453,7 +457,9 @@ export default function ConnectScreen() {
                     </TouchableOpacity>
                 </View>
 
-                <Text style={[styles.version, { color: theme.textSecondary }]}>Lovii v1.0.0 • Premium Rewards</Text>
+                <Text style={[styles.version, { color: theme.textSecondary }]}>
+                    Lovii v1.0.0 • ID: {profile?.id}
+                </Text>
             </ScrollView>
 
             <CustomAlert

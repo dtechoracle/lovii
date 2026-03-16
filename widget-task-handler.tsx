@@ -1,7 +1,8 @@
-import { Note, StorageService } from '@/services/storage';
+import { StorageService } from '@/services/storage';
 import React from 'react';
 import { WidgetTaskHandlerProps } from 'react-native-android-widget';
 import { AndroidWidget } from './components/AndroidWidget';
+import { calculateStreak } from './services/streak';
 
 const WIDGET_NAME = 'LoviiWidget';
 
@@ -44,14 +45,18 @@ export async function widgetTaskHandler(props: WidgetTaskHandlerProps) {
             const partnerName = profile?.partnerName || 'Partner';
 
             // Determine dark mode
-            // themeMode is 'light' | 'dark' | 'auto'
-            const isDark = profile?.themeMode === 'dark';
-            // Note: themePreference is usually a palette name like 'ocean', not 'dark'.
-            // But if we want to support 'system' (auto) we might default to light in background 
-            // unless we store the last known system state. 
-            // For now, let's use the explicit 'dark' mode setting if available.
-            // Actually, let's check if the palette itself implies dark? No.
-            // Let's rely on themeMode.
+            const themeMode = profile?.themeMode || 'auto';
+            let isDark = themeMode === 'dark';
+
+            if (themeMode === 'auto') {
+                try {
+                    const Appearance = require('react-native').Appearance;
+                    const sysMode = Appearance ? Appearance.getColorScheme() : 'light';
+                    isDark = sysMode === 'dark';
+                } catch (e) {
+                    isDark = false;
+                }
+            }
 
             props.renderWidget(
                 <AndroidWidget
@@ -69,7 +74,8 @@ export async function widgetTaskHandler(props: WidgetTaskHandlerProps) {
                     fontFamily={latestNote.fontFamily}
                     fontWeight={latestNote.fontWeight}
                     fontStyle={latestNote.fontStyle}
-                    textDecorationLine={latestNote.textDecorationLine}
+                    widgetWidth={widgetInfo.width}
+                    widgetHeight={widgetInfo.height}
                 />
             );
         } catch (error) {
@@ -85,57 +91,4 @@ export async function widgetTaskHandler(props: WidgetTaskHandlerProps) {
             );
         }
     }
-}
-
-/**
- * Snapchat-style streak: BOTH users must have sent at least one note on the same
- * calendar day for that day to count towards the streak. If either side misses a
- * day, the streak resets to 0 and can only start again when both send on the same day.
- * restoredDays: days where the streak was restored via 5-point purchase — count as mutual-send days.
- */
-function calculateStreak(myNotes: Note[], partnerNotes: Note[], restoredDays: number[] = []): number {
-    if (!myNotes.length && !partnerNotes.length && !restoredDays.length) return 0;
-
-    const toMidnight = (ts: number) => {
-        const d = new Date(ts);
-        return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
-    };
-
-    // Build sets of unique days each side sent
-    const myDays = new Set(myNotes.map(n => toMidnight(n.timestamp)));
-    const partnerDays = new Set(partnerNotes.map(n => toMidnight(n.timestamp)));
-
-    // Restored days count as "both sent" for that calendar day
-    restoredDays.forEach(day => {
-        myDays.add(day);
-        partnerDays.add(day);
-    });
-
-    // Days where BOTH sent (or streak was restored)
-    const bothSentDays = Array.from(myDays)
-        .filter(day => partnerDays.has(day))
-        .sort((a, b) => b - a); // Most recent first
-
-    if (bothSentDays.length === 0) return 0;
-
-    const today = toMidnight(Date.now());
-    const oneDay = 24 * 60 * 60 * 1000;
-
-    // Streak only alive if the most recent mutual day is today or yesterday
-    if (bothSentDays[0] < today - oneDay) return 0;
-
-    // Count consecutive days backwards from the most recent mutual day
-    let streak = 1;
-    let expectedDay = bothSentDays[0] - oneDay;
-
-    for (let i = 1; i < bothSentDays.length; i++) {
-        if (bothSentDays[i] === expectedDay) {
-            streak++;
-            expectedDay -= oneDay;
-        } else {
-            break;
-        }
-    }
-
-    return streak;
 }

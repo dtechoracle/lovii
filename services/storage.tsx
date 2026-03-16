@@ -4,6 +4,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
 import * as FileSystem from 'expo-file-system';
 import { requestWidgetUpdate } from 'react-native-android-widget';
+import { calculateStreak } from './streak';
 
 // API Base URL - In dev, likely localhost or dev server IP.
 // Vercel deployment URL or localhost
@@ -66,7 +67,7 @@ export const StorageService = {
 
             const data = await res.json();
 
-            // Get local cache to preserve local-only settings
+            // preserve local-only settings
             const localDataStr = await AsyncStorage.getItem(KEYS.USER_DATA);
             const localData = localDataStr ? JSON.parse(localDataStr) : null;
 
@@ -74,20 +75,21 @@ export const StorageService = {
             const localThemePref = await AsyncStorage.getItem(KEYS.THEME_PREF);
             const localThemeMode = await AsyncStorage.getItem(KEYS.THEME_MODE);
 
+            // Safety: If backend forgets partner code but we already have it locally, KEEP IT.
+            const syncedPartnerCode = (data.partnerCode && data.partnerCode !== "") ? data.partnerCode : localData?.connectedPartnerCode;
+
             // Points from backend
             const backendPoints = data.points ?? 0;
-            // maxPoints ensures the UI Ring shrinks/fills correctly. 
-            // It should be at least backendPoints, or the previous highest maxPoints.
             const localMax = localData?.maxPoints ?? 0;
             const newMaxPoints = Math.max(localMax, backendPoints);
 
             const profile: UserProfile = {
                 id: data.id,
                 name: data.name || 'User',
-                partnerCode: data.code,
+                partnerCode: data.code, // User's own code
                 connectedPartnerId: data.partnerId || undefined,
                 partnerName: data.partnerName || undefined,
-                connectedPartnerCode: data.partnerCode || undefined,
+                connectedPartnerCode: syncedPartnerCode || undefined,
                 anniversary: data.connectedAt ? new Date(data.connectedAt).getTime() : undefined,
                 gender: (localGender as 'male' | 'female') || 'female',
                 avatarUri: data.avatar,
@@ -163,7 +165,11 @@ export const StorageService = {
                 const res = await fetch(`${API_URL}/profile`, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ id: p.id, avatar: avatarData }),
+                    body: JSON.stringify({
+                        id: p.id,
+                        name: p.name, // Include name to ensure it's not cleared
+                        avatar: avatarData
+                    }),
                 });
 
                 if (res.ok) {
@@ -201,8 +207,24 @@ export const StorageService = {
         }
     },
 
+    async clearSession(): Promise<void> {
+        // Clear everything EXCEPT Push Token and persistent theme preference
+        const pushToken = await AsyncStorage.getItem(KEYS.PUSH_TOKEN);
+        const themeMode = await AsyncStorage.getItem(KEYS.THEME_MODE);
+        const themePref = await AsyncStorage.getItem(KEYS.THEME_PREF);
+
+        await AsyncStorage.clear();
+
+        if (pushToken) await AsyncStorage.setItem(KEYS.PUSH_TOKEN, pushToken);
+        if (themeMode) await AsyncStorage.setItem(KEYS.THEME_MODE, themeMode);
+        if (themePref) await AsyncStorage.setItem(KEYS.THEME_PREF, themePref);
+    },
+
     // Called by LOGIN/REGISTER to set initial state
     async setSession(user: any): Promise<void> {
+        // Clear previous user's data to prevent leakage on same phone
+        await this.clearSession();
+
         const profile: UserProfile = {
             id: user.id,
             name: user.name,
@@ -237,13 +259,21 @@ export const StorageService = {
     async saveProfile(profile: UserProfile): Promise<void> {
         await this.saveLocalProfile(profile);
         try {
+            const payload: any = {
+                id: profile.id,
+                name: profile.name,
+            };
+
+            // Only send avatar if it's a real URL (not local file path)
+            // This ensures we keep the Cloudinary URL active on the server
+            if (profile.avatarUri && !profile.avatarUri.startsWith('file:')) {
+                payload.avatar = profile.avatarUri;
+            }
+
             await fetch(`${API_URL}/profile`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    id: profile.id,
-                    name: profile.name,
-                }),
+                body: JSON.stringify(payload),
             });
         } catch (e) { console.error('saveProfile sync error', e); }
     },
@@ -264,7 +294,9 @@ export const StorageService = {
                     if (p) {
                         p.connectedPartnerId = data.partnerId;
                         p.partnerName = data.partnerName;
-                        p.connectedPartnerCode = data.partnerCode;
+                        if (data.partnerCode) {
+                            p.connectedPartnerCode = data.partnerCode;
+                        }
                         await this.saveLocalProfile(p);
                         // Refresh profile after point deduction or new partner
                         await this.syncProfile(myId!);
@@ -456,7 +488,14 @@ export const StorageService = {
                     tasks: (typeof n.tasks === 'string' ? JSON.parse(n.tasks) : n.tasks) || (n.type === 'tasks' && n.content ? (() => { try { return JSON.parse(n.content); } catch (e) { return undefined; } })() : undefined)
                 }));
 
-                const merged = [...remoteNotes, ...localNotes].filter((v, i, a) => a.findIndex(v2 => (v2.id === v.id)) === i);
+                const merged = [...remoteNotes, ...localNotes].filter((v, i, a) =>
+                    a.findIndex(v2 => (
+                        v2.id === v.id ||
+                        (v2.type === v.type &&
+                            v2.content === v.content &&
+                            Math.abs(v2.timestamp - v.timestamp) < 300000) // 5 min window
+                    )) === i
+                );
                 merged.sort((a, b) => b.timestamp - a.timestamp);
 
                 await AsyncStorage.setItem(KEYS.LOCAL_NOTES, JSON.stringify(merged));
@@ -518,7 +557,7 @@ export const StorageService = {
             notes = notes.map(n => n.id === noteId ? { ...n, ...updates } : n);
             await AsyncStorage.setItem(KEYS.LOCAL_NOTES, JSON.stringify(notes));
 
-            fetch(`${API_URL} / notes`, {
+            fetch(`${API_URL}/notes`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ id: noteId, ...updates }),
@@ -571,7 +610,7 @@ export const StorageService = {
     },
 
     subscribeToPartnerNotes(callback: (note: Note) => void) {
-        let lastNoteTimestamp = Date.now();
+        let lastNoteTimestamp = 0; // Initialize to 0 to catch notes immediately on start
         const interval = setInterval(async () => {
             const notes = await this.getPartnerNotes();
             if (notes.length > 0) {
@@ -579,6 +618,12 @@ export const StorageService = {
                 if (latest.timestamp > lastNoteTimestamp) {
                     lastNoteTimestamp = latest.timestamp;
                     callback(latest);
+
+                    const partnerNotes = await this.getPartnerNotes();
+                    const myNotes = await this.getMyHistory();
+                    const restoredDays = await this.getRestoredStreakDays();
+                    const streak = calculateStreak(myNotes, partnerNotes, restoredDays);
+                    const profile = await this.getProfile();
 
                     requestWidgetUpdate({
                         widgetName: WIDGET_NAME,
@@ -588,6 +633,9 @@ export const StorageService = {
                                 type={latest.type}
                                 timestamp={latest.timestamp}
                                 color={latest.color}
+                                streak={streak}
+                                partnerName={profile?.partnerName || 'Partner'}
+                                isDark={profile?.themeMode === 'dark'}
                                 hasPartnerNote={true}
                                 fontFamily={latest.fontFamily}
                                 fontWeight={latest.fontWeight}
@@ -660,6 +708,36 @@ export const StorageService = {
         return this.sendToPartnerWidget(note);
     },
 
+    async pushExistingNoteToWidget(noteId: string): Promise<any> {
+        try {
+            const userId = await AsyncStorage.getItem(KEYS.USER_ID);
+            if (!userId) return { success: false, error: 'Not logged in' };
+
+            const response = await fetch(`${API_URL}/widget`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    myId: userId,
+                    noteId
+                }),
+            });
+
+            if (!response.ok) {
+                const data = await response.json();
+                return { success: false, error: data.error || 'Failed to send' };
+            }
+
+            const result = await response.json();
+            return {
+                success: true,
+                partner: result.partner,
+                partnerWidget: result.partnerWidget
+            };
+        } catch (e) {
+            return { success: false, error: String(e) };
+        }
+    },
+
     async getPartnerWidgetStatus(): Promise<any> {
         try {
             const userId = await AsyncStorage.getItem(KEYS.USER_ID);
@@ -677,6 +755,12 @@ export const StorageService = {
             const notes = await this.getPartnerNotes();
             if (notes.length > 0) {
                 const latest = notes[0];
+                const partnerNotes = await this.getPartnerNotes();
+                const myNotes = await this.getMyHistory();
+                const restoredDays = await this.getRestoredStreakDays();
+                const streak = calculateStreak(myNotes, partnerNotes, restoredDays);
+                const profile = await this.getProfile();
+
                 requestWidgetUpdate({
                     widgetName: WIDGET_NAME,
                     renderWidget: () => (
@@ -685,6 +769,9 @@ export const StorageService = {
                             type={latest.type}
                             timestamp={latest.timestamp}
                             color={latest.color}
+                            streak={streak}
+                            partnerName={profile?.partnerName || 'Partner'}
+                            isDark={profile?.themeMode === 'dark'}
                             hasPartnerNote={true}
                             fontFamily={latest.fontFamily}
                             fontWeight={latest.fontWeight}
@@ -729,8 +816,13 @@ export const StorageService = {
             // Save Cache
             await AsyncStorage.setItem(KEYS.PARTNER_NOTES, JSON.stringify(notes));
 
+            // Prepare dynamic data for widget
+            const myNotes = await this.getMyHistory();
+            const restoredDays = await this.getRestoredStreakDays();
+            const streak = calculateStreak(myNotes, notes, restoredDays);
+            const profile = await this.getProfile();
+
             // Force Widget Update immediately with this specific note data
-            // This bypasses the need to fetch or read from storage again for the widget
             requestWidgetUpdate({
                 widgetName: WIDGET_NAME,
                 renderWidget: () => (
@@ -739,6 +831,9 @@ export const StorageService = {
                         type={note.type}
                         timestamp={note.timestamp}
                         color={note.color}
+                        streak={streak}
+                        partnerName={profile?.partnerName || 'Partner'}
+                        isDark={profile?.themeMode === 'dark'}
                         hasPartnerNote={true}
                         fontFamily={note.fontFamily}
                         fontWeight={note.fontWeight}

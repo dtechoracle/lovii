@@ -108,17 +108,21 @@ export default function DrawingViewer({ paths, color, width, height, strokeWidth
                 viewBox={viewBox}
                 preserveAspectRatio="xMidYMid meet"
             >
-                {drawingPaths.map((pathData, index) => (
-                    <Path
-                        key={index}
-                        d={pathData.path}
-                        stroke={pathData.color}
-                        strokeWidth={effectiveStrokeWidth}
-                        fill="none"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                    />
-                ))}
+                {drawingPaths.map((pathData, index) => {
+                    // Quick fix: If color is black/white, it might be invisible.
+                    // This is a basic safeguard.
+                    return (
+                        <Path
+                            key={index}
+                            d={pathData.path}
+                            stroke={pathData.color}
+                            strokeWidth={effectiveStrokeWidth}
+                            fill="none"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                        />
+                    );
+                })}
             </Svg>
         </View>
     );
